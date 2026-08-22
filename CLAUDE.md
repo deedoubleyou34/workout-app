@@ -31,9 +31,9 @@ An installed PWA that runs Dom's 4-day training program on his iPhone: audio-gui
 Phase 0 produces these three values. Nothing in Phase 5 works until all three are filled in here and match exactly.
 
 ```
-GitHub Pages URL:      https://<github-username>.github.io/workout-app/
-Spotify Client ID:     <32 hex chars from developer.spotify.com dashboard>
-Spotify redirect URI:  https://<github-username>.github.io/workout-app/
+GitHub Pages URL:      https://deedoubleyou34.github.io/workout-app/
+Spotify Client ID:     cf46be5104434a87948db209215d61f7
+Spotify redirect URI:  https://deedoubleyou34.github.io/workout-app/
 ```
 
 Rules for these values:
@@ -91,6 +91,10 @@ Do not scaffold future phases "while you're in there." The gates exist because i
 ## Findings log
 
 Running record of audit findings and decisions made as phases progress. Newest first. Add an entry whenever a phase surfaces something that changes the plan, the spec, or how we work.
+
+### 2026-08-22 — Phase 0 deployed
+
+Shell pushed to `deedoubleyou34/workout-app`, GitHub Pages live at https://deedoubleyou34.github.io/workout-app/ (verified 200 serving index.html). Spotify app registered: Client ID `cf46be5104434a87948db209215d61f7`, redirect URI = Pages URL exactly. Project constants above are now filled. Remaining before the phase closes: iPhone home-screen install and the four exit-gate checks (standalone chrome, airplane mode, <2-min update propagation, constants match).
 
 ### 2026-08-21 — Pre-Phase-0 document audit (coach + spec)
 
