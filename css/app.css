@@ -1,0 +1,37 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0f1115;
+  --fg: #e8eaed;
+  --muted: #8a8f98;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+#app {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+h1 {
+  font-size: 2.5rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+#status, #build {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
