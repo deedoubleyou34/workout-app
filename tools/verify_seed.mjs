@@ -1,0 +1,125 @@
+// Machine-checkable Phase 1 gate items, run against the real schema + seed.
+// Usage: node tools/verify_seed.mjs   (from the repo root)
+import { createRequire } from 'module';
+import { readFileSync } from 'fs';
+import { seed, EXERCISES, DAYS } from '../js/seed.js';
+
+const require = createRequire(import.meta.url);
+const initSqlJs = require('../vendor/sql-wasm.js');
+
+const SQL = await initSqlJs({ locateFile: (f) => 'vendor/' + f });
+const db = new SQL.Database();
+db.run(readFileSync('js/schema.sql', 'utf8'));
+seed(db);
+
+let failures = 0;
+function check(name, ok, detail = '') {
+  console.log((ok ? 'PASS' : 'FAIL') + '  ' + name + (detail ? '  [' + detail + ']' : ''));
+  if (!ok) failures++;
+}
+function one(sql, params = []) {
+  const stmt = db.prepare(sql);
+  stmt.bind(params);
+  stmt.step();
+  const row = stmt.getAsObject();
+  stmt.free();
+  return row;
+}
+function all(sql, params = []) {
+  const stmt = db.prepare(sql);
+  stmt.bind(params);
+  const rows = [];
+  while (stmt.step()) rows.push(stmt.getAsObject());
+  stmt.free();
+  return rows;
+}
+
+// -- counts --
+check('5 day templates (4 days + nightly)', one('SELECT COUNT(*) c FROM day_template').c === 5);
+const exCount = one('SELECT COUNT(*) c FROM exercise').c;
+check('exercise count matches seed source', exCount === EXERCISES.length, exCount + ' rows');
+const blockCount = one('SELECT COUNT(*) c FROM block').c;
+const expectedBlocks = DAYS.reduce((n, d) => n + d.blocks.length, 0);
+check('block count matches seed source', blockCount === expectedBlocks, blockCount + ' rows');
+
+// -- no orphan exercises, none missing --
+const orphans = all('SELECT name FROM exercise WHERE id NOT IN (SELECT exercise_id FROM block)');
+check('every exercise appears in at least one block', orphans.length === 0, orphans.map(o => o.name).join(', '));
+
+// -- instruction / feel_cue non-empty everywhere --
+const noInstr = one("SELECT COUNT(*) c FROM exercise WHERE instruction IS NULL OR instruction = '' OR feel_cue IS NULL OR feel_cue = ''").c;
+check('every exercise has non-empty instruction + feel_cue', noInstr === 0);
+
+// -- bias_side spot checks (spec Phase 1 gate) --
+function biasOf(exName, dayNo) {
+  const r = one(
+    'SELECT b.bias_side bs FROM block b JOIN exercise e ON e.id=b.exercise_id ' +
+    'JOIN day_template d ON d.id=b.day_template_id WHERE e.name=? AND d.day_no=?',
+    [exName, dayNo]);
+  return r.bs === undefined ? '(absent)' : r.bs;
+}
+check("side plank with abduction = right", biasOf('Side plank with abduction', 2) === 'right');
+check("Copenhagen plank = left (Day 1)", biasOf('Copenhagen plank', 1) === 'left');
+check("Copenhagen plank = left (Day 4)", biasOf('Copenhagen plank', 4) === 'left');
+check("single-leg glute bridge (nightly) = right", biasOf('Single-leg glute bridge', 0) === 'right');
+check("reverse Nordic = NULL", biasOf('Reverse Nordic', 2) === null);
+check("pogo hops NULL in Day 1 warm-up", one(
+  "SELECT b.bias_side bs FROM block b JOIN exercise e ON e.id=b.exercise_id JOIN day_template d ON d.id=b.day_template_id " +
+  "WHERE e.name='Single-leg ankle pogo hops' AND d.day_no=1 AND b.block_code='warmup'").bs === null);
+check("pogo hops left in Day 1 finisher", one(
+  "SELECT b.bias_side bs FROM block b JOIN exercise e ON e.id=b.exercise_id JOIN day_template d ON d.id=b.day_template_id " +
+  "WHERE e.name='Single-leg ankle pogo hops' AND d.day_no=1 AND b.block_code='finisher'").bs === 'left');
+
+// -- asymmetric prescriptions are separate left/right rows --
+const asym = one(
+  "SELECT COUNT(*) c FROM block b WHERE " +
+  "(SELECT COUNT(DISTINCT side) FROM block_target t WHERE t.block_id=b.id AND t.side IN ('left','right')) = 2").c;
+check('asymmetric/unilateral targets stored as separate L/R rows', asym > 20, asym + ' blocks with both sides');
+
+// -- exclusions --
+const sprint = one("SELECT COUNT(*) c FROM exercise WHERE name LIKE '%sprint%'").c;
+check('no exercise references sprinting', sprint === 0);
+const rampin = one(
+  "SELECT COUNT(*) c FROM exercise WHERE name LIKE '%no jump%' OR name LIKE '%step-down%' " +
+  "OR name LIKE '%knee-to-wall%' OR name LIKE '%short-lever%'").c;
+check('nothing from RAMP-IN / RE-CHECK sections in seed', rampin === 0);
+
+// -- rest periods: Day 1 work+rest lands in the 100-115 min window --
+// Time model mirrors the runner semantics in the spec's "Main work" walkthrough:
+// left+right of a unilateral drill run back-to-back inside one ROUND, supersets
+// pair a+b inside a round, and rest_seconds_after fires once per round (it is 0
+// on 'a' blocks; the pair's rest lives on the 'b' block). Work: holds at face
+// value, reps at 3 s (2 s in warm-ups), distance at 2 s/m, 15 s setup per block.
+const day1 = all(
+  'SELECT b.id, b.block_code code, b.rest_seconds_after rest, e.is_timed FROM block b ' +
+  'JOIN exercise e ON e.id=b.exercise_id JOIN day_template d ON d.id=b.day_template_id ' +
+  'WHERE d.day_no=1 ORDER BY b.order_index');
+let total = 0;
+for (const b of day1) {
+  const targets = all('SELECT * FROM block_target WHERE block_id=?', [b.id]);
+  const repSec = b.code === 'warmup' ? 2 : 3;
+  let rounds = 0, work = 0;
+  for (const t of targets) {
+    rounds = Math.max(rounds, t.sets);
+    if (t.hold_seconds) work += t.sets * t.hold_seconds;
+    else if (t.distance_m) work += t.sets * t.distance_m * 2;
+    else work += t.sets * t.reps * repSec;
+  }
+  total += work + rounds * b.rest + 15;
+}
+const mins = total / 60;
+check('Day 1 estimated duration in 100-115 min window', mins >= 100 && mins <= 115, mins.toFixed(1) + ' min');
+
+// -- nightly holds stay in the 45-60s band except left-calf 90s + close couch 120 --
+const longNight = all(
+  "SELECT e.name, t.side, t.hold_seconds h FROM block_target t JOIN block b ON b.id=t.block_id " +
+  "JOIN exercise e ON e.id=b.exercise_id JOIN day_template d ON d.id=b.day_template_id " +
+  "WHERE d.day_no=0 AND t.hold_seconds > 60");
+const allowed = longNight.every(r =>
+  (r.name.startsWith('Standing calf stretch') && r.side === 'left' && r.h === 90) ||
+  (r.name === 'Couch stretch' && r.side === 'left' && r.h === 120));
+check('nightly holds: only left-calf 90s and closing couch 120s exceed 60s', allowed,
+  longNight.map(r => r.name + ' ' + r.side + ' ' + r.h + 's').join('; '));
+
+console.log(failures === 0 ? '\nALL CHECKS PASSED' : '\n' + failures + ' CHECK(S) FAILED');
+process.exit(failures === 0 ? 0 : 1);

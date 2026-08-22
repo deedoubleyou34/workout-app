@@ -1,11 +1,18 @@
 // Cache-first app shell. Bump CACHE on every deploy that changes shell files.
-const CACHE = 'shell-v5';
+const CACHE = 'shell-v6';
 
 const SHELL = [
   './',
   './index.html',
   './css/app.css',
   './js/main.js',
+  './js/db.js',
+  './js/seed.js',
+  './js/schema.sql',
+  './js/ui/home.js',
+  './js/ui/day.js',
+  './vendor/sql-wasm.js',
+  './vendor/sql-wasm.wasm',
   './manifest.webmanifest',
   './icons/icon-180.png',
   './icons/icon-192.png',
