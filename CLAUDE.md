@@ -92,6 +92,15 @@ Do not scaffold future phases "while you're in there." The gates exist because i
 
 Running record of audit findings and decisions made as phases progress. Newest first. Add an entry whenever a phase surfaces something that changes the plan, the spec, or how we work.
 
+### 2026-08-22 — Phase 0 COMPLETE (all exit gates passed on Dom's iPhone)
+
+Gates verified: standalone launch with no Safari chrome; opens in airplane mode; push→phone propagation ~45–60 s automatic (build 005 gate test); constants recorded and matching. Two hard-won lessons now baked into the shell:
+
+1. **Install fetches must bypass the HTTP cache.** GitHub Pages serves `max-age=600`; `cache.addAll` without `{ cache: 'reload' }` rebuilds the "new" cache from stale files and updates silently stall (build 002 failure).
+2. **iOS standalone PWAs never check for SW updates on resume.** Resuming from memory is not a navigation. The shell now calls `registration.update()` on launch and on `visibilitychange`, and reloads once on `controllerchange` (builds 003→004 required manual Safari reloads; 004→005 propagated hands-free). **TODO for Phase 2:** the `controllerchange` reload must be deferred while a workout session is active — never reload mid-session.
+
+Deploy discipline: every shell-file change bumps both the `CACHE` constant in `sw.js` and the visible build number in `index.html`. Pages deploy lag after push is ~40–60 s; phone pickup adds up to ~1 min.
+
 ### 2026-08-22 — Phase 0 deployed
 
 Shell pushed to `deedoubleyou34/workout-app`, GitHub Pages live at https://deedoubleyou34.github.io/workout-app/ (verified 200 serving index.html). Spotify app registered: Client ID `cf46be5104434a87948db209215d61f7`, redirect URI = Pages URL exactly. Project constants above are now filled. Remaining before the phase closes: iPhone home-screen install and the four exit-gate checks (standalone chrome, airplane mode, <2-min update propagation, constants match).
