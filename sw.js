@@ -1,5 +1,5 @@
 // Cache-first app shell. Bump CACHE on every deploy that changes shell files.
-const CACHE = 'shell-v2';
+const CACHE = 'shell-v3';
 
 const SHELL = [
   './',
@@ -14,7 +14,11 @@ const SHELL = [
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      // cache: 'reload' bypasses the HTTP cache — GitHub Pages serves max-age=600,
+      // and stale install fetches would rebuild the "new" cache from old files.
+      .then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' }))))
+      .then(() => self.skipWaiting())
   );
 });
 
