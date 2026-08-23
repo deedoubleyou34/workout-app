@@ -164,8 +164,9 @@ export function renderRun(root, dayNo) {
       fields.append(labelled('Weight (lb)', wIn));
     }
     if (showBand) {
+      // bands are logged by their pound rating — always a number, never text
       bandIn = document.createElement('input');
-      bandIn.type = 'text';
+      bandIn.type = 'number'; bandIn.inputMode = 'decimal'; bandIn.step = '5'; bandIn.min = '0';
       const prev = load.band_level ?? query(
         'SELECT band_level FROM set_log WHERE exercise_id=? AND side=? AND band_level IS NOT NULL ORDER BY id DESC LIMIT 1',
         [step.block.exercise_id, step.side])[0]?.band_level;
@@ -215,11 +216,12 @@ export function renderRun(root, dayNo) {
 
   function drawRest(step) {
     if (!restStartedAt) { restStartedAt = Date.now(); save(); }
-    const card = el('section', 'runcard restcard');
-    card.append(el('div', 'runside', 'REST'));
+    const card = el('section', 'runcard restcard' + (step.main ? ' mainrest' : ''));
+    card.append(el('div', 'runside', step.main ? 'MAIN REST' : 'REST'));
     const clock = el('div', 'restclock', '');
     card.append(clock);
-    card.append(el('p', 'muted', 'after ' + step.after));
+    card.append(el('p', 'muted', step.main ? step.after + ' complete' : 'after ' + step.after));
+    if (step.main) card.append(el('p', 'restnext', 'Up next: ' + step.nextCategory));
     const next = steps[index + 1];
     if (next && next.kind === 'set') {
       card.append(el('p', 'restnext',

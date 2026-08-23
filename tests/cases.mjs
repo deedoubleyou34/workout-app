@@ -368,19 +368,35 @@ export async function run(ctx) {
   {
     const steps = buildSteps([
       blk({ id: 1, code: '1a', group: '1', name: 'Thrust', rest: 0, targets: [{ side: 'both', sets: 3, reps: 8 }] }),
-      blk({ id: 2, code: '1b', group: '1', name: 'Flexion', rest: 120, targets: [{ side: 'both', sets: 2, reps: 12 }] }),
+      blk({ id: 2, code: '1b', group: '1', name: 'Flexion', rest: 90, targets: [{ side: 'both', sets: 2, reps: 12 }] }),
     ]);
     eq('superset alternates and rest follows the pair',
       steps.map(sig),
-      ['Thrust:B1', 'Flexion:B1', 'rest120', 'Thrust:B2', 'Flexion:B2', 'rest120', 'Thrust:B3', 'summary']);
+      ['Thrust:B1', 'Flexion:B1', 'rest90', 'Thrust:B2', 'Flexion:B2', 'rest90', 'Thrust:B3', 'summary']);
   }
 
   // 23. no trailing rest at the very end of the session
   {
-    const steps = buildSteps([blk({ id: 1, code: 'finisher', name: 'Wall sit', rest: 30, timed: true,
+    const steps = buildSteps([blk({ id: 1, code: 'finisher', name: 'Wall sit', rest: 20, timed: true,
       targets: [{ side: 'both', sets: 2, hold_seconds: 90 }] })]);
     eq('session does not end on a rest step',
-      steps.map(sig), ['Wall sit:B1', 'rest30', 'Wall sit:B2', 'summary']);
+      steps.map(sig), ['Wall sit:B1', 'rest20', 'Wall sit:B2', 'summary']);
+  }
+
+  // 23b. one MAIN REST at each category change, not a rest after the category's
+  // last round followed by another (Dom, 2026-08-23)
+  {
+    const steps = buildSteps([
+      blk({ id: 1, code: 'knee', name: 'Nordic', rest: 60, targets: [{ side: 'both', sets: 2, reps: 5 }] }),
+      blk({ id: 2, code: '1a', group: '1', name: 'Thrust', rest: 0, targets: [{ side: 'both', sets: 2, reps: 8 }] }),
+      blk({ id: 3, code: '1b', group: '1', name: 'Flexion', rest: 90, targets: [{ side: 'both', sets: 2, reps: 12 }] }),
+    ]);
+    eq('main rest lands at the category boundary, no double rest',
+      steps.map(sig),
+      ['Nordic:B1', 'rest60', 'Nordic:B2', 'rest60', 'Thrust:B1', 'Flexion:B1', 'rest90', 'Thrust:B2', 'Flexion:B2', 'summary']);
+    const main = steps.filter((s) => s.kind === 'rest' && s.main);
+    eq('the boundary rest is flagged as the main rest and names what is next',
+      [main.length, main[0].nextCategory], [1, 'Superset A']);
   }
 
   // 24. resume lands on the first unlogged set, and rest is not replayed

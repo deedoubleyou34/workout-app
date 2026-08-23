@@ -1,6 +1,6 @@
 import { query, exec, getDb, persist } from '../db.js';
 import { computeFlags } from '../progression.js';
-import { currentSession, startSession, finishSession, startOver, today } from '../sessions.js';
+import { activeSession, lastCompleted, startSession, finishSession, startOver, today } from '../sessions.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -110,8 +110,8 @@ export function renderDay(root, dayNo) {
   const setLogs = new Map();   // block_id|side|set_index -> row
   const nightLogs = new Map(); // drill|side -> row
   if (!isNightly) {
-    // abandoned sessions are history, not the day in front of you
-    session = currentSession(getDb(), dayNo);
+    // only a live session fills the grid — a finished day resets for next time
+    session = activeSession(getDb(), dayNo);
     if (session) {
       for (const r of query('SELECT * FROM set_log WHERE session_id = ?', [session.id])) {
         setLogs.set(r.block_id + '|' + r.side + '|' + r.set_index, r);
@@ -172,6 +172,14 @@ export function renderDay(root, dayNo) {
   header.append(el('p', 'muted', day.name));
 
   if (!isNightly) {
+    const done = lastCompleted(getDb(), dayNo);
+    if (done && !session) {
+      header.append(el('p', 'lastdone',
+        'Last completed ' + (done.daysAgo === 0 ? 'today' : done.daysAgo === 1 ? 'yesterday'
+          : done.daysAgo + ' days ago') + ' — ' + done.sets + ' sets, ' + done.hits
+        + ' on target. Targets below include any progressions you accepted.'));
+    }
+
     const controls = el('div', 'btnrow');
     const loggedCount = setLogs.size;
 
@@ -376,8 +384,10 @@ export function renderDay(root, dayNo) {
       fields.append(label('Weight (lb)', wIn));
     }
     if (showBand) {
+      // bands are logged by their pound rating — always a number, never text
       bandIn = document.createElement('input');
-      bandIn.type = 'text'; bandIn.placeholder = 'band (color/lb)';
+      bandIn.type = 'number'; bandIn.inputMode = 'decimal'; bandIn.step = '5'; bandIn.min = '0';
+      bandIn.placeholder = 'band lb';
       const prev2 = existing?.band_level ?? approved.band_level ?? query(
         'SELECT band_level FROM set_log WHERE exercise_id=? AND side=? AND band_level IS NOT NULL ORDER BY id DESC LIMIT 1',
         [block.exercise_id, target.side])[0]?.band_level;

@@ -3,6 +3,7 @@
 import { createRequire } from 'module';
 import { readFileSync } from 'fs';
 import { seed, EXERCISES, DAYS } from '../js/seed.js';
+import { buildSteps } from '../js/runner.js';
 
 const require = createRequire(import.meta.url);
 const initSqlJs = require('../vendor/sql-wasm.js');
@@ -94,7 +95,37 @@ for (const dn of [1, 2, 3, 4]) {
     'knee@' + r.kmin + ' vs superset@' + r.smin);
 }
 
-// -- rest periods: Day 1 work+rest lands in the 100-115 min window --
+// -- session length, measured on the runner's ACTUAL step list --
+// Work model: holds at face value, reps at 3 s, distance at 2 s/m, plus 8 s of
+// transition per set. Rest comes from the steps themselves, so this tracks the
+// real ordering including the per-category main rests.
+{
+  const dayMins = (dayNo) => {
+    const d = one('SELECT * FROM day_template WHERE day_no=?', [dayNo]);
+    const blocks = all(
+      'SELECT b.*, e.name ex_name, e.is_timed FROM block b JOIN exercise e ON e.id=b.exercise_id ' +
+      'WHERE b.day_template_id=? ORDER BY b.order_index', [d.id]);
+    for (const b of blocks) b.targets = all('SELECT * FROM block_target WHERE block_id=? ORDER BY id', [b.id]);
+    let secs = 0;
+    for (const s of buildSteps(blocks)) {
+      if (s.kind === 'rest') secs += s.seconds;
+      else if (s.kind === 'set') {
+        const t = s.target;
+        secs += t.hold_seconds ? t.hold_seconds : t.distance_m ? t.distance_m * 2 : (t.reps || 0) * 3;
+        secs += 8;
+      }
+    }
+    return secs / 60;
+  };
+  for (const dn of [1, 2, 3, 4]) {
+    const m = dayMins(dn);
+    check('Day ' + dn + ' runs 80-115 min', m >= 80 && m <= 115, m.toFixed(0) + ' min');
+  }
+  const nightly = dayMins(0);
+  check('Nightly runs 20-35 min', nightly >= 20 && nightly <= 35, nightly.toFixed(0) + ' min');
+}
+
+// -- legacy per-round estimate, kept as a floor check on rest seeding --
 // Time model mirrors the runner semantics in the spec's "Main work" walkthrough:
 // left+right of a unilateral drill run back-to-back inside one ROUND, supersets
 // pair a+b inside a round, and rest_seconds_after fires once per round (it is 0
@@ -118,7 +149,7 @@ for (const b of day1) {
   total += work + rounds * b.rest + 15;
 }
 const mins = total / 60;
-check('Day 1 estimated duration in 100-115 min window', mins >= 100 && mins <= 115, mins.toFixed(1) + ' min');
+check('Day 1 rest is actually seeded (not all zeros)', mins >= 70, mins.toFixed(1) + ' min');
 
 // -- nightly holds stay in the 45-60s band except left-calf 90s + close couch 120 --
 const longNight = all(

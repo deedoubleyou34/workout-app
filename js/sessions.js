@@ -35,6 +35,25 @@ export function currentSession(db, dayNo) {
     'ORDER BY id DESC LIMIT 1', [dayNo, today()])[0] || null;
 }
 
+// Only a session still being worked. Once a day is finished it becomes history:
+// reopening that day gives a clean slate carrying any accepted progressions,
+// rather than showing yesterday's (or this morning's) filled-in sets.
+export function activeSession(db, dayNo) {
+  return rows(db,
+    "SELECT * FROM session WHERE day_no = ? AND date = ? AND status = 'in_progress' " +
+    'ORDER BY id DESC LIMIT 1', [dayNo, today()])[0] || null;
+}
+
+export function lastCompleted(db, dayNo) {
+  const s = rows(db,
+    "SELECT * FROM session WHERE day_no = ? AND status = 'complete' ORDER BY date DESC, id DESC LIMIT 1",
+    [dayNo])[0];
+  if (!s) return null;
+  const counts = rows(db,
+    'SELECT COUNT(*) sets, COALESCE(SUM(hit_target),0) hits FROM set_log WHERE session_id = ?', [s.id])[0];
+  return { ...s, sets: counts.sets, hits: counts.hits, daysAgo: daysBetween(s.date, today()) };
+}
+
 export function startSession(db, dayNo) {
   db.run("INSERT INTO session (date, day_no, status, started_at) VALUES (?, ?, 'in_progress', ?)",
     [today(), dayNo, new Date().toISOString()]);

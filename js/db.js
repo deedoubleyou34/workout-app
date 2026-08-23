@@ -19,38 +19,7 @@ export const MIGRATIONS = [
     // NOT block_code, which the reorder renamed (e.g. Copenhagen 3b→3a).
     version: 2,
     run(db) {
-      const readBlocks = () => {
-        const rows = [];
-        const stmt = db.prepare(
-          'SELECT b.id, d.day_no, b.exercise_id FROM block b ' +
-          'JOIN day_template d ON d.id = b.day_template_id ORDER BY b.id');
-        while (stmt.step()) rows.push(stmt.getAsObject());
-        stmt.free();
-        return rows;
-      };
-      const keyed = (rows) => {
-        const seen = new Map();
-        const out = new Map();
-        for (const r of rows) {
-          const base = r.day_no + '|' + r.exercise_id;
-          const n = (seen.get(base) || 0) + 1;
-          seen.set(base, n);
-          out.set(base + '|' + n, r.id);
-        }
-        return out;
-      };
-      const oldMap = keyed(readBlocks());
-      db.run('DELETE FROM block_target; DELETE FROM block; DELETE FROM day_template; DELETE FROM exercise;');
-      seed(db);
-      const newMap = keyed(readBlocks());
-      // negative temp ids first so remaps never collide with real ids
-      const pairs = [];
-      for (const [key, oldId] of oldMap) {
-        const newId = newMap.get(key);
-        if (newId !== undefined && newId !== oldId) pairs.push([oldId, newId]);
-      }
-      pairs.forEach(([oldId], i) => db.run('UPDATE set_log SET block_id=? WHERE block_id=?', [-(i + 1), oldId]));
-      pairs.forEach(([, newId], i) => db.run('UPDATE set_log SET block_id=? WHERE block_id=?', [newId, -(i + 1)]));
+      reseedAndRemap(db);
     },
   },
   {
@@ -63,8 +32,56 @@ export const MIGRATIONS = [
       db.run('ALTER TABLE current_load ADD COLUMN reps INTEGER');
     },
   },
+  {
+    // v4 (build 012): rest periods shortened (Dom, 2026-08-23).
+    version: 4,
+    run(db) {
+      reseedAndRemap(db);
+    },
+  },
 ];
+// MIGRATIONS must stay in ascending version order — they are applied in array
+// order and each one bumps the stored version, so an out-of-order entry would
+// make every lower version unreachable.
 const SCHEMA_VERSION = 1 + MIGRATIONS.length;
+
+// Rebuild the library tables from the current seed, preserving logged history.
+// Block ids shift on every reseed, so set_log.block_id is remapped by
+// (day_no, exercise_id, occurrence) — NOT by block_code, which reorders rename.
+function reseedAndRemap(db) {
+  const readBlocks = () => {
+    const out = [];
+    const stmt = db.prepare(
+      'SELECT b.id, d.day_no, b.exercise_id FROM block b ' +
+      'JOIN day_template d ON d.id = b.day_template_id ORDER BY b.id');
+    while (stmt.step()) out.push(stmt.getAsObject());
+    stmt.free();
+    return out;
+  };
+  const keyed = (blocks) => {
+    const seen = new Map();
+    const out = new Map();
+    for (const r of blocks) {
+      const base = r.day_no + '|' + r.exercise_id;
+      const n = (seen.get(base) || 0) + 1;
+      seen.set(base, n);
+      out.set(base + '|' + n, r.id);
+    }
+    return out;
+  };
+  const oldMap = keyed(readBlocks());
+  db.run('DELETE FROM block_target; DELETE FROM block; DELETE FROM day_template; DELETE FROM exercise;');
+  seed(db);
+  const newMap = keyed(readBlocks());
+  // negative temp ids first so remaps never collide with real ids
+  const pairs = [];
+  for (const [key, oldId] of oldMap) {
+    const newId = newMap.get(key);
+    if (newId !== undefined && newId !== oldId) pairs.push([oldId, newId]);
+  }
+  pairs.forEach(([oldId], i) => db.run('UPDATE set_log SET block_id=? WHERE block_id=?', [-(i + 1), oldId]));
+  pairs.forEach(([, newId], i) => db.run('UPDATE set_log SET block_id=? WHERE block_id=?', [newId, -(i + 1)]));
+}
 
 let SQL = null;
 let db = null;
