@@ -1,6 +1,6 @@
-# Where I left off — Training Companion
+# Where I left off — Hyperbolic Time Chamber
 
-**Last updated:** 2026-08-22 · **Live build:** 009 · **Status:** Phase 1 confirmed except the DBeaver step (deferred, needs a PC). Phase 2 built and deployed; awaiting Dom's gate run on the iPhone.
+**Last updated:** 2026-08-23 · **Live build:** 011 · **Status:** Phases 0–1 done, Phase 2 built and fixed, Phase 3 (session runner) built and deployed. Everything outstanding needs Dom's hands on the phone — nothing is blocked on more code.
 
 ---
 
@@ -10,109 +10,93 @@
 |---|---|
 | Live URL | https://deedoubleyou34.github.io/workout-app/ |
 | GitHub repo | https://github.com/deedoubleyou34/workout-app (branch `main`) |
-| Local repo | `Projects/Workout/workout-app/` — standalone git repo, own history, pushes straight to Pages |
+| Local repo | `Projects/Workout/workout-app/` — standalone git repo, pushes straight to Pages |
 | Spotify Client ID | `cf46be5104434a87948db209215d61f7` (redirect URI = the Pages URL exactly; no secret, PKCE) |
-| Installed | Yes — Dom's iPhone home screen, opens offline, self-updates in ~45–60 s |
+| Name | **Hyperbolic Time Chamber** (icon label "Chamber") |
 
-The parent folder (`Projects/Workout/`) holds the reference copies of `workout_plan.txt`, `PROJECT_SPEC.md`, and `CLAUDE.md`. **The copies inside `workout-app/` are the canonical ones** — they ship with the app. Keep the parent copies in sync at phase boundaries (`cp workout-app/workout_plan.txt .` etc.).
-
----
-
-## Phase 0 — COMPLETE
-
-All four exit gates passed on the real iPhone: standalone launch with no Safari chrome, opens in airplane mode, push-to-phone propagation ~45–60 s automatic, constants recorded and matching.
-
-Two fixes that are now permanent parts of the shell:
-1. **Service-worker install fetches use `{ cache: 'reload' }`.** GitHub Pages serves `max-age=600`, so a new cache version was being rebuilt from stale files and updates silently stalled.
-2. **The app checks for updates itself** — `registration.update()` on launch and on `visibilitychange`, then reloads once on `controllerchange`. iOS standalone PWAs resuming from memory never check on their own; before this, updates needed a manual Safari reload.
-
-Also: `.nojekyll` is required in the repo root. Without it GitHub's Jekyll build fails on the app files and deploys stop landing with no visible error.
+The parent folder holds reference copies of `workout_plan.txt`, `PROJECT_SPEC.md`, `CLAUDE.md`. **The copies inside `workout-app/` are canonical** — keep the parent copies in sync at phase boundaries.
 
 ---
 
-## Phase 1 — Built, deployed, mostly confirmed
+## ⚠️ Waiting on Dom — do these on the iPhone
 
-**Shipped:** vendored sql.js (offline, no CDN) → SQLite persisted to IndexedDB after every write, schema version table with a forward-only migration path, `navigator.storage.persist()`, full seed, manual logging UI, and .sqlite/.json export + import.
+**The home-screen icon still says "Train."** iOS caches that label at install time. To pick up the new name: press and hold the icon → Remove from Home Screen, then reopen the Pages URL in Safari → Share → Add to Home Screen. Nothing else needs a reinstall; normal updates still arrive on their own.
 
-**The seed:** 63 exercises, 5 day templates (Days 1–4 + Nightly as `day_no = 0`), 90 blocks. Per-block `bias_side`, asymmetric prescriptions as separate left/right rows, Appendix A `instruction` + `feel_cue` on every exercise. RAMP-IN and RE-CHECK sections excluded per spec §1.3.
+### Phase 2 gate (progression engine)
+- [ ] Home screen → **Run progression tests →** at the bottom, in Safari on the phone. Expect **ALL 53 TESTS PASSED**. Screenshot anything that fails.
+- [ ] Log a day clean, finish it → home should now say *"that's 1 of 2"* rather than showing nothing.
+- [ ] Log the same day clean a second time → grouped suggestions appear.
+- [ ] **Accept** one → reopen that day, the prefilled weight should show the new number.
+- [ ] **Decline** another → load unchanged, and it should not come back next session.
+- [ ] Read the suggestion wording and tell me if it reads like plain English.
 
-**Verification tooling** (run these before any seed change ships):
-```
-cd Projects/Workout/workout-app
-node tools/verify_seed.mjs        # 21 checks — counts, bias spot-checks, exclusions, Day 1 duration
-node tools/verify_migration.mjs   # replays migrations against the real v1 seed from git history
-```
-Both pass. Day 1 estimated duration is 110.5 min, inside the plan's 100–115 window.
+### Phase 3 gate (session runner) — needs one real Day 4
+- [ ] Run a full Day 4 start to finish with the runner (home → **▶ Run Day 4**).
+- [ ] Rest timer accurate within ±3 s over the whole session — start a stopwatch at session start, compare at the end.
+- [ ] Screen never sleeps during the session; note the battery % used over ~110 min.
+- [ ] Force-quit mid-session, reopen → resumes at the exact set with earlier sets intact.
+- [ ] Every unilateral block leads with the correct side (left for the hip-flexor/ankle work, right for glute-med work).
+- [ ] No set required typing beyond confirming the prefilled numbers.
 
-### Exit gate status
-
-- [x] Seed counts correct; asymmetric targets stored as separate L/R rows
-- [x] Logged sets survive force-quit **and a phone restart** (Dom confirmed)
-- [x] `bias_side` spot-checks (Copenhagen left, side plank w/ abduction right, nightly SL glute bridge right, reverse Nordic NULL)
-- [x] Rest periods seeded; Day 1 lands in the 100–115 min window
-- [x] No sprinting; nothing from RAMP-IN / RE-CHECK in the seed
-- [x] Every exercise has non-empty instruction + feel_cue
-- [ ] **DEFERRED — export .sqlite → open in DBeaver → import back.** Needs a PC; Dom explicitly agreed this does not block phase progression. Do it when he's at a computer.
-- [ ] Dom's review of the seeded instructions/feel cues for accuracy (in progress — he's been using the app)
+### Deferred from Phase 1 (needs a PC, agreed not to block)
+- [ ] Export `.sqlite` from the home screen → open in DBeaver → confirm `set_log` holds your sets → Import the same file back into the app.
 
 ---
 
-## Changes made after the first Phase 1 deploy (Dom's direction)
+## What each phase delivered
 
-**build 007** — day screen sectioned: tab bar per category (Warm-up / A / B / C / Knee / Power / Finish; tabs turn gold when every set in the section is logged), one exercise per screen with prev/next buttons and swipe, and the scroll position resets to the top after logging a set.
+### Phase 0 — hosting and shell (COMPLETE)
+Installed PWA, opens offline, updates reach the phone in ~45–60 s automatically. Two permanent fixes: service-worker install fetches use `{ cache: 'reload' }` (Pages serves `max-age=600`, so a new cache was being rebuilt from stale files), and the app checks for updates itself on launch and on `visibilitychange` (iOS standalone PWAs never check on resume). `.nojekyll` in the repo root is required or deploys silently stop landing.
 
-**build 008** — four things:
+### Phase 1 — database and manual logging (COMPLETE except the DBeaver check)
+sql.js vendored, SQLite persisted to IndexedDB, forward-only migrations. Seed: 63 exercises, 5 day templates, 90 blocks, per-block bias sides, separate L/R targets, Appendix A instruction + feel cue on every exercise. Export/import ships here.
 
-1. **Block order changed on every lifting day.** Warm-up → **knee/tendon block** (moved up as targeted knee prep) → main lifts → finisher. Within supersets, **unilateral before bilateral** (Copenhagen before KB swings, the SL RDL pair promoted to Superset A on Day 4, suitcase carry before sled march). **Coach exception:** explosive pairs (trap bar jump shrug) stay first among the main lifts — ballistic work on fatigued tendons is what philosophy points 2 and 8 forbid. The rule is written into `workout_plan.txt`'s WEEKLY STRUCTURE section.
-2. **Schema migration v2** remaps `set_log.block_id` across the reorder, keyed by **(day_no, exercise_id, occurrence)** — *not* `block_code`, which the reorder renamed (Copenhagen went 3b→3a). First attempt keyed on block_code and mis-mapped 14 of 90 sets; `tools/verify_migration.mjs` caught it. **This is the pattern for every future seed reorder.**
-3. **Day screen split into three cards**: exercise (name / targets / rest), **How** (instruction + feel cue), **Set log** (aligned grid — one column per set number, one row per leg, so left and right line up).
-4. **DBZ Super Saiyan theme** — Saiyan gold, gi orange, ki blue on deep space; italic uppercase headers; gold glow on completed sets; power-level line on the home screen computed from logged volume (crosses "IT'S OVER 9,000!" as real volume accumulates).
+### Phase 2 — progression engine (built; gate not yet run)
+`js/progression.js`: two clean sessions → `increase`; one miss → nothing; two → `hold`; three → `reduce`. Warm-ups and mobility never progress. **Accept is the only thing that writes `current_load`.** `add_load` replaces `increase` at the ceilings (hold at 120 s, band at +3 reps, knee work at +6 reps); power work only ever gets a `review` note. Decline suppresses a flag until two fresh clean sessions; Snooze deliberately does not.
+
+Three bugs found and fixed in build 010:
+1. First suggestion on a weighted lift built on zero — read *"try 5 lb."* Now builds on the weight actually logged.
+2. `acceptFlag` ignored snoozed flags, so Accept on a snoozed card silently did nothing.
+3. Two clean sessions produced 16 separate cards; suggestions are now grouped per exercise with an **Accept all**.
+
+### Phase 3 — silent session runner (built; gate not yet run)
+`js/runner.js` builds the ordered step list as a **pure function**, so ordering is tested without a DOM or clock: supersets alternate a→b→rest per round, the biased side always leads, a side whose sets are used up is never offered again (4 left / 3 right yields no 4th right set), and a session never ends on a rest step. Day 4 comes out to 76 set steps and 41 rests, ~40 min of prescribed rest.
+
+`js/ui/run.js` is the full-screen runner: one large **Done** button with weight/reps prefilled, a rest countdown computed from `Date.now()` deltas (repainted on `visibilitychange`, so iOS throttling can't make it drift), Screen Wake Lock acquired on entry and re-acquired on resume with a visible indicator when the lock is **not** held, position saved to `meta.runner_state` after every step for exact resume, and a summary screen that lists misses and raises flags on finish.
+
+Also fixed here: an app update no longer reloads mid-session — the reload waits until you leave the runner.
+
+---
+
+## Build 010 — home dashboard and session lifecycle (Dom's direction)
+
+- **Home is a real dashboard**: power level, a **Next up** card (which day is due, cycling 1→2→3→4→1, ignoring nightly, with "last trained N days ago"), suggestions, day list with last-trained chips, nightly streak.
+- **"How does it reset?"** — a session belongs to (day, date), so opening a day on a new date is automatically a clean slate. Nothing to press.
+- **Start over** on a day abandons the current session and opens a fresh one. Nothing is deleted; abandoned work stays in history but never reaches the progression engine.
+- **↻ refresh** on the day screen re-reads the database and checks for an app update.
 
 ---
 
 ## Open questions for Dom
 
-1. ~~Side plank with abduction (Day 2)~~ — **confirmed correct** by Dom 2026-08-22: right 3×10 / left 2×10.
-2. Sled/carry distances log through the reps field labeled "Distance (m)" — `set_log` has no distance column, so a meter is stored as a rep against a meter target.
-3. Nightly drills log one value per side per night (habit tracker, per the schema's unique constraint), not per-set.
-4. Should "next" auto-advance to the first **unlogged** exercise instead of strict order?
+1. ~~Side plank with abduction (Day 2)~~ — **confirmed correct**: right 3×10 / left 2×10.
+2. Sled/carry distances log through a field labelled "Distance (m)" — `set_log` has no distance column, so a metre is stored as a rep against a metre target.
+3. Nightly drills log one value per side per night (habit tracker), not per-set.
+4. Warm-up rest is 30 s after **every** drill, which is what the plan says but makes the warm-up long in the runner — worth checking how it feels in practice.
 
 ---
 
-## Phase 2 — Built and deployed (build 009), gate not yet run
+## Next up — Phase 4 (not started)
 
-`js/progression.js` implements spec §4 as pure functions (`ruleFor`, `isSessionHit`, `trailingStreak`, `evaluate`) with a thin SQL layer that gathers history and writes `progression_flag`. Two clean sessions → `increase`; one miss → nothing; two → `hold`; three → `reduce`. Warm-up blocks and the mobility category never progress. Suggestions are surfaced only — **Accept is the sole path that writes `current_load`**.
+Audio cues. `tools/gen_audio.py` renders MP3 clips with `edge-tts` on the PC (build time only, committed to the repo), the runner concatenates and plays them, iOS audio is unlocked by the session-start tap. Still no Spotify. Instructions and feel cues are **never spoken** — they stay on-screen text.
 
-Extra rule detail worth knowing:
-- **`add_load`** fires instead of `increase` at the ceilings: a hold at 120 s, a band at +3 reps, knee/tibialis work at +6 reps. **`review`** is what power work gets — no numbers, just a quality note.
-- **Decline** suppresses that flag until the triggering streak starts *after* the decline (two fresh clean sessions). **Snooze** deliberately skips suppression, so it returns next session.
-- Sled is matched before the `power` category in `ruleFor` — sled push/march are `category='power'` but §4.2 gives sled +10 lb.
-
-**Migration v3** added `current_load.reps` (the approved rep target) — §4.2 progresses band and knee work by reps and the original schema had nowhere to put it.
-
-**Tests:** `tests/cases.mjs` is the single source; `tests/test.html` runs it in Safari (the gate) and `tools/run_tests.mjs` runs the same 34 assertions in Node. All passing locally.
-
-### Phase 2 exit gate — Dom's part
-- [ ] Open **Run progression tests →** at the bottom of the home screen (or `/tests/test.html`) **in Safari on the iPhone** — must show ALL 34 TESTS PASSED
-- [ ] Log two clean sessions on something loaded, Finish session each time → suggestion appears on home
-- [ ] Accept → next session's prefilled weight reflects the new load
-- [ ] Decline → `current_load` unchanged and the flag does not come back next session
-- [ ] Read the generated reason strings and confirm they make sense in plain English
-
-**Carry into Phase 3:** the `controllerchange` auto-reload in `js/main.js` must be deferred while a session is in progress — an update must never reload the app mid-set.
-
-## Next up — Phase 3 (not started)
-
-Session runner, silent: the state machine that walks blocks in order, runs rest timers off `Date.now()` deltas (never `setInterval` tick counts — iOS throttles background timers), holds a screen wake lock, and recovers if the app is killed mid-session. No audio yet.
-
-## Deploy loop (for whoever picks this up)
+## Deploy loop
 
 ```
 cd Projects/Workout/workout-app
-# edit files
-# bump CACHE in sw.js AND the build number in index.html (both places: <p id="build"> and window.BUILD)
-node tools/verify_seed.mjs && node tools/verify_migration.mjs
+# edit, then bump CACHE in sw.js AND the build number in index.html (both spots)
+node tools/run_tests.mjs && node tools/verify_seed.mjs && node tools/verify_migration.mjs
 git add -A && git commit -m "..." && git push
-# Pages deploy lands in ~40–60 s; phone picks it up within ~1 min of foregrounding
+# Pages lands in ~40–60 s; the phone picks it up within ~1 min of foregrounding
 ```
 Forgetting the `CACHE` bump means phones keep serving the old shell from cache.

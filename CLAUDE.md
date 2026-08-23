@@ -92,6 +92,29 @@ Do not scaffold future phases "while you're in there." The gates exist because i
 
 Running record of audit findings and decisions made as phases progress. Newest first. Add an entry whenever a phase surfaces something that changes the plan, the spec, or how we work.
 
+### 2026-08-23 — Phase 3 built: silent session runner (build 011)
+
+- **`buildSteps()` in `js/runner.js` is pure** — blocks + targets in, ordered step list out. Ordering rules (bias side first, superset alternation, asymmetric set counts, rest placement) are unit-tested with no DOM and no clock. Any future ordering change goes there, not into the UI.
+- **A side whose sets are exhausted is simply not offered.** 4 left / 3 right produces no 4th right step, which is the spec's "Dom does not have to remember the bias — it is in the data."
+- **Rest never trails the session.** The final round of the final block goes straight to the summary.
+- **Timers are `Date.now()` deltas repainted on `visibilitychange`.** The runner recomputes on resume rather than counting ticks, so an iOS-throttled background does not cause drift.
+- **Runner position lives in `meta.runner_state`** (JSON, keyed to session id), saved after every step. On resume, if the step it lands on is already logged, it jumps to the first unlogged set — that covers the app dying between the set write and the state save.
+- **All `set_log` writes now go through `sessions.logSet()`.** Two call sites (manual day view, runner) were about to diverge on the append-only rules.
+- **Service-worker updates are deferred during a session.** `controllerchange` sets a pending flag and the reload happens on leaving the runner — reloading mid-set would drop the wake lock and the rest timer. This closes the TODO carried since build 004.
+
+### 2026-08-23 — Build 010: dashboard, session lifecycle, three engine bugs
+
+Dom finished a session and saw no suggestion. The engine was right (§4.1 needs **two** consecutive clean sessions) but said nothing, and silence is indistinguishable from broken. Fixes:
+
+1. **Say why there is no suggestion.** The home screen now reports the last session and how far along the streak is ("that's 1 of 2").
+2. **First suggestion built on zero** → *"hit every set two sessions running. Try 5 lb."* With no `current_load` row, `increase()` added the increment to nothing. `computeFlags` now falls back to the weight actually logged, read-only — Accept is still the only writer (§4.3).
+3. **Accept did nothing on a snoozed flag.** `pendingFlags()` returns pending *and* snoozed; `acceptFlag()` required `status='pending'`.
+4. **16 suggestions after two clean sessions.** Now grouped per exercise with an Accept all.
+
+Also: session lifecycle centralised in `js/sessions.js`. A session belongs to (day, date), so a new date is automatically a clean slate; **Start over** abandons rather than deletes, keeping `set_log` append-only while ensuring abandoned work never reaches the engine (`computeFlags` only reads `status='complete'`).
+
+Renamed to **Hyperbolic Time Chamber** (short name "Chamber"). iOS caches the home-screen label at install, so the icon keeps the old name until the app is removed and re-added — worth telling Dom whenever a manifest name changes.
+
 ### 2026-08-22 — Phase 2 built: progression rule engine (build 009)
 
 - **`current_load` gained a `reps` column (migration v3).** Spec §3 gives current_load weight/band/hold only, but §4.2 progresses band work (+1 rep to +3, then band step) and knee/tibialis work (+2 reps to +6, then vest) by REPS. The approved rep target had nowhere to live. `reps` is the approved working target; the seed is never rewritten, and `block_target` stays the prescription.
