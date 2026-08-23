@@ -1,6 +1,6 @@
 {
-  "name": "Training Companion",
-  "short_name": "Train",
+  "name": "Hyperbolic Time Chamber",
+  "short_name": "Chamber",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -1,16 +1,12 @@
 import { query, exec, getDb, persist } from '../db.js';
 import { computeFlags } from '../progression.js';
+import { currentSession, startSession, finishSession, startOver, today } from '../sessions.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
   if (text !== undefined) n.textContent = text;
   return n;
-}
-
-function today() {
-  const d = new Date();
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
 const SECTION_LABELS = {
@@ -114,10 +110,8 @@ export function renderDay(root, dayNo) {
   const setLogs = new Map();   // block_id|side|set_index -> row
   const nightLogs = new Map(); // drill|side -> row
   if (!isNightly) {
-    session = query(
-      'SELECT * FROM session WHERE day_no = ? AND date = ? ORDER BY id DESC LIMIT 1',
-      [dayNo, today()]
-    )[0] || null;
+    // abandoned sessions are history, not the day in front of you
+    session = currentSession(getDb(), dayNo);
     if (session) {
       for (const r of query('SELECT * FROM set_log WHERE session_id = ?', [session.id])) {
         setLogs.set(r.block_id + '|' + r.side + '|' + r.set_index, r);
@@ -131,11 +125,8 @@ export function renderDay(root, dayNo) {
 
   async function getOrCreateSession() {
     if (session && session.status === 'in_progress') return session;
-    const id = await exec(
-      "INSERT INTO session (date, day_no, status, started_at) VALUES (?, ?, 'in_progress', ?)",
-      [today(), dayNo, new Date().toISOString()]
-    );
-    session = { id, date: today(), day_no: dayNo, status: 'in_progress' };
+    session = startSession(getDb(), dayNo);
+    await persist();
     return session;
   }
 
@@ -156,31 +147,71 @@ export function renderDay(root, dayNo) {
   root.className = 'page';
 
   const header = el('header', 'top');
+  const navRow = el('div', 'navrow');
   const back = el('a', 'back', '‹ Home');
   back.href = '#/';
-  header.append(back);
+  navRow.append(back);
+  const refresh = el('button', 'iconbtn', '↻');
+  refresh.title = 'Reload from the database and check for an app update';
+  refresh.onclick = async () => {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) reg.update().catch(() => {});
+    }
+    renderDay(root, dayNo);
+  };
+  navRow.append(refresh);
+  header.append(navRow);
+
   const titleRow = el('div', 'titlerow');
   titleRow.append(el('h1', null, isNightly ? 'Nightly' : 'Day ' + dayNo));
   if (!isNightly && session) {
     titleRow.append(el('span', 'chip chip-' + session.status, session.status.replace('_', ' ')));
-    if (session.status === 'in_progress') {
-      const fin = el('button', 'btn btn-small', 'Finish session');
-      fin.onclick = async () => {
-        await exec("UPDATE session SET status='complete', ended_at=? WHERE id=?",
-          [new Date().toISOString(), session.id]);
-        const flags = computeFlags(getDb(), session.id);
-        await persist();
-        if (flags.length) {
-          alert(flags.length + (flags.length === 1 ? ' suggestion' : ' suggestions')
-            + ' waiting on the home screen.');
-        }
-        renderDay(root, dayNo);
-      };
-      titleRow.append(fin);
-    }
   }
   header.append(titleRow);
   header.append(el('p', 'muted', day.name));
+
+  if (!isNightly) {
+    const controls = el('div', 'btnrow');
+    const loggedCount = setLogs.size;
+
+    if (!session) {
+      const start = el('button', 'btn btn-primary btn-small', 'Start session');
+      start.onclick = async () => {
+        await getOrCreateSession();
+        renderDay(root, dayNo);
+      };
+      controls.append(start);
+    } else if (session.status === 'in_progress') {
+      const fin = el('button', 'btn btn-primary btn-small', 'Finish session');
+      fin.onclick = async () => {
+        const hits = query('SELECT COUNT(*) c FROM set_log WHERE session_id=? AND hit_target=1',
+          [session.id])[0].c;
+        finishSession(getDb(), session.id);
+        const flags = computeFlags(getDb(), session.id);
+        await persist();
+        alert('Day ' + dayNo + ' complete — ' + loggedCount + ' sets, ' + hits + ' on target.\n\n'
+          + (flags.length
+            ? flags.length + (flags.length === 1 ? ' suggestion is' : ' suggestions are') + ' waiting on the home screen.'
+            : 'No suggestions yet — a jump needs two clean sessions in a row.'));
+        renderDay(root, dayNo);
+      };
+      controls.append(fin);
+    }
+
+    if (session && loggedCount) {
+      const over = el('button', 'btn btn-small btn-danger', 'Start over');
+      over.onclick = async () => {
+        if (!confirm('Start Day ' + dayNo + ' over? The ' + loggedCount
+          + ' sets you logged stay in your history but will not count toward progression.')) return;
+        startOver(getDb(), dayNo);
+        await persist();
+        renderDay(root, dayNo);
+      };
+      controls.append(over);
+    }
+    if (controls.childNodes.length) header.append(controls);
+  }
   root.append(header);
 
   // ---------- section tabs ----------

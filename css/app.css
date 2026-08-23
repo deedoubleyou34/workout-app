@@ -69,13 +69,67 @@ html, body {
 .titlerow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .titlerow .btn-small { margin-top: 0; }
 
+.navrow { display: flex; align-items: center; justify-content: space-between; }
+.iconbtn {
+  min-width: 44px;
+  min-height: 44px;
+  background: var(--card);
+  color: var(--fg);
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  font-size: 1.05rem;
+}
+.iconbtn.ok { color: var(--gold); border-color: var(--gold); }
+.iconbtn.no { color: var(--muted); }
+
+/* ---------- next up ---------- */
+.nextsec { margin-bottom: 20px; }
+.nextsec h2, .listhead, .notesec h2 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.nextcard {
+  background: linear-gradient(160deg, #1c2540, var(--card));
+  border: 1px solid var(--gold);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 0 22px rgba(255, 215, 94, 0.18);
+}
+.nextday {
+  font-size: 1.6rem;
+  font-weight: 800;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+}
+.nextname { font-size: 0.95rem; margin-top: 2px; }
+.nextcard .muted { margin-top: 4px; }
+.nextstart {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  margin-top: 12px;
+  padding: 12px;
+}
+
+/* ---------- suggestions ---------- */
 .flagsec { margin-bottom: 20px; }
-.flagsec h2 {
+.flagsechead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.flagsechead h2 {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--gold);
-  margin-bottom: 8px;
 }
 .flagcard {
   background: var(--card);
@@ -87,17 +141,37 @@ html, body {
 }
 .flagcard.flag-hold, .flagcard.flag-review { border-left-color: var(--ki); }
 .flagcard.flag-reduce { border-left-color: var(--miss); }
-.flaghead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.flagname { font-weight: 800; font-size: 1rem; margin-bottom: 8px; }
+.flagline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.flagside { color: var(--muted); font-weight: 700; min-width: 14px; }
 .flagkind {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   color: var(--gold);
 }
-.flag-hold .flagkind, .flag-review .flagkind { color: var(--ki); }
-.flag-reduce .flagkind { color: var(--miss); }
-.flagreason { font-size: 0.9rem; line-height: 1.4; }
+.flagkind-hold, .flagkind-review { color: var(--ki); }
+.flagkind-reduce { color: var(--miss); }
+.flagmove { font-weight: 700; font-size: 0.95rem; }
+.flagbtns { margin-left: auto; display: flex; gap: 6px; }
+.flagreason {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--muted);
+  margin: 4px 0 10px;
+}
+
+.notesec {
+  border: 1px dashed var(--edge);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 20px;
+}
+.notetext { font-size: 0.9rem; line-height: 1.4; color: var(--fg); opacity: 0.9; }
+.streakline { color: var(--ki); font-weight: 700; }
+.daycard-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.daycard-meta { color: var(--muted); font-size: 0.75rem; margin-top: 4px; }
 
 .daylist { display: flex; flex-direction: column; gap: 10px; }
 .daycard {

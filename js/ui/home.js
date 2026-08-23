@@ -1,5 +1,6 @@
 import { query, storageStatus, exportSqliteBlob, exportJsonBlob, importBytes, getDb, persist } from '../db.js';
-import { pendingFlags, acceptFlag, declineFlag, snoozeFlag } from '../progression.js';
+import { pendingFlags, acceptFlag, acceptAll, declineFlag, snoozeFlag, isSessionHit } from '../progression.js';
+import { daySummaries, nextDayUp, lastSessionReport, nightlyStreak, today } from '../sessions.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -16,72 +17,157 @@ function download(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
-function today() {
-  const d = new Date();
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const UNIT_LABEL = { lb: 'lb', sec: 's', rep: ' reps', band_step: '', vest: '' };
+
+// "L  45 → 50 lb" — the whole suggestion at a glance.
+function moveText(f) {
+  const to = f.suggested_value;
+  const u = UNIT_LABEL[f.suggested_unit] ?? '';
+  if (f.suggested_unit === 'band_step') return 'next band up, reset to ' + to + ' reps';
+  if (f.suggested_unit === 'vest') return 'add vest, reset to ' + to + ' reps';
+  if (to == null) return f.flag === 'hold' ? 'hold here' : 'review';
+  return '→ ' + to + u;
 }
 
 export function renderHome(root) {
+  const db = getDb();
   root.innerHTML = '';
   root.className = 'page';
 
+  // ---------- title + power level ----------
   const header = el('header', 'top');
-  header.append(el('h1', null, 'Training Companion'));
+  header.append(el('h1', null, 'Hyperbolic Time Chamber'));
+  const vol = query(
+    'SELECT COALESCE(SUM(reps_done),0) reps, COALESCE(SUM(hold_seconds_done),0) holds, ' +
+    'COALESCE(SUM(weight_lb*reps_done),0) tonnage FROM set_log')[0];
+  const setCount = query('SELECT COUNT(*) c FROM set_log')[0].c;
+  const nightCount = query('SELECT COUNT(*) c FROM nightly_log')[0].c;
+  const power = Math.round(setCount * 100 + vol.reps * 10 + vol.holds * 5 + vol.tonnage / 10 + nightCount * 50);
+  header.append(el('p', 'powerline',
+    '⚡ Power level: ' + power.toLocaleString() + (power > 9000 ? " — IT'S OVER 9,000!" : '')));
   root.append(header);
 
-  // ---------- pending progression flags (§4.3: surfaced, never applied) ----------
-  const flags = pendingFlags(getDb());
-  if (flags.length) {
-    const sec = el('section', 'flagsec');
-    sec.append(el('h2', null, flags.length === 1 ? '1 suggestion' : flags.length + ' suggestions'));
-    for (const f of flags) {
-      const card = el('div', 'flagcard flag-' + f.flag);
-      const head = el('div', 'flaghead');
-      head.append(el('span', 'flagkind', f.flag.replace('_', ' ')));
-      if (f.side !== 'both') head.append(el('span', 'chip chip-bias', f.side));
-      if (f.status === 'snoozed') head.append(el('span', 'chip', 'snoozed'));
-      card.append(head);
-      card.append(el('p', 'flagreason', f.reason));
+  // ---------- next up ----------
+  const next = nextDayUp(db);
+  const nextSec = el('section', 'nextsec');
+  nextSec.append(el('h2', null, 'Next up'));
+  const nextCard = el('div', 'nextcard');
+  nextCard.append(el('div', 'nextday', 'Day ' + next.day_no));
+  nextCard.append(el('div', 'nextname', next.name));
+  nextCard.append(el('p', 'muted',
+    next.daysAgo == null ? 'not trained yet'
+      : next.daysAgo === 0 ? 'last trained today'
+      : next.daysAgo === 1 ? 'last trained yesterday'
+      : 'last trained ' + next.daysAgo + ' days ago'));
+  const startBtn = el('a', 'btn btn-primary nextstart', 'Start Day ' + next.day_no);
+  startBtn.href = '#/day/' + next.day_no;
+  nextCard.append(startBtn);
+  nextSec.append(nextCard);
+  root.append(nextSec);
 
-      const row = el('div', 'btnrow');
-      const decide = (fn, label) => {
-        const btn = el('button', 'btn btn-small' + (label === 'Accept' ? ' btn-primary' : ''), label);
-        btn.onclick = async () => {
-          fn(getDb(), f.id);
-          await persist();
-          renderHome(root);
-        };
-        return btn;
+  // ---------- suggestions, grouped per exercise ----------
+  const flags = pendingFlags(db);
+  if (flags.length) {
+    const byExercise = new Map();
+    for (const f of flags) {
+      if (!byExercise.has(f.ex_name)) byExercise.set(f.ex_name, []);
+      byExercise.get(f.ex_name).push(f);
+    }
+
+    const sec = el('section', 'flagsec');
+    const head = el('div', 'flagsechead');
+    head.append(el('h2', null,
+      flags.length === 1 ? '1 suggestion' : flags.length + ' suggestions'));
+    const applicable = flags.filter((f) => f.suggested_unit);
+    if (applicable.length > 1) {
+      const all = el('button', 'btn btn-small btn-primary', 'Accept all');
+      all.onclick = async () => {
+        if (!confirm('Apply all ' + applicable.length + ' suggestions?')) return;
+        acceptAll(db, applicable.map((f) => f.id));
+        await persist();
+        renderHome(root);
       };
-      // 'hold' and 'review' carry no value to apply — acknowledging is the action.
-      if (f.suggested_unit) row.append(decide(acceptFlag, 'Accept'));
-      row.append(decide(declineFlag, f.suggested_unit ? 'Decline' : 'Got it'));
-      if (f.status !== 'snoozed') row.append(decide(snoozeFlag, 'Snooze'));
-      card.append(row);
+      head.append(all);
+    }
+    sec.append(head);
+
+    for (const [name, group] of byExercise) {
+      const card = el('div', 'flagcard flag-' + group[0].flag);
+      card.append(el('div', 'flagname', name));
+      for (const f of group) {
+        const line = el('div', 'flagline');
+        const label = el('span', 'flagside', f.side === 'both' ? '—' : f.side[0].toUpperCase());
+        const kind = el('span', 'flagkind flagkind-' + f.flag, f.flag.replace('_', ' '));
+        line.append(label, kind, el('span', 'flagmove', moveText(f)));
+        if (f.status === 'snoozed') line.append(el('span', 'chip', 'snoozed'));
+
+        const btns = el('span', 'flagbtns');
+        const decide = (fn, text, cls) => {
+          const b = el('button', 'iconbtn' + (cls ? ' ' + cls : ''), text);
+          b.onclick = async () => {
+            fn(db, f.id);
+            await persist();
+            renderHome(root);
+          };
+          return b;
+        };
+        if (f.suggested_unit) btns.append(decide(acceptFlag, '✓', 'ok'));
+        btns.append(decide(declineFlag, '✕', 'no'));
+        if (f.status !== 'snoozed') btns.append(decide(snoozeFlag, 'z'));
+        line.append(btns);
+        card.append(line);
+
+        const why = el('p', 'flagreason', f.reason);
+        card.append(why);
+      }
       sec.append(card);
     }
     root.append(sec);
+  } else {
+    // No flags is a real answer, not an error — say why (§4.1 needs two clean
+    // sessions in a row before anything is suggested).
+    const report = lastSessionReport(db, isSessionHit);
+    if (report) {
+      const note = el('section', 'notesec');
+      const when = report.session.date === today() ? 'today' : 'on ' + report.session.date;
+      if (report.missedPairs === 0 && report.cleanPairs > 0) {
+        note.append(el('p', 'notetext',
+          'Day ' + report.session.day_no + ' ' + when + ' was clean — ' + report.sets + ' sets, '
+          + report.cleanPairs + ' exercises on target. '
+          + (report.priorClean
+            ? 'Suggestions are waiting above.'
+            : "That's 1 of 2. Run it clean once more and the app will suggest a jump.")));
+      } else if (report.cleanPairs > 0) {
+        note.append(el('p', 'notetext',
+          'Day ' + report.session.day_no + ' ' + when + ': ' + report.cleanPairs + ' on target, '
+          + report.missedPairs + ' short. No changes suggested — one short session is noise.'));
+      }
+      if (note.childNodes.length) root.append(note);
+    }
   }
 
-  const days = query(
-    'SELECT * FROM day_template ORDER BY CASE day_no WHEN 0 THEN 99 ELSE day_no END'
-  );
-  const sessionsToday = query('SELECT day_no, status FROM session WHERE date = ?', [today()]);
-  const statusByDay = new Map(sessionsToday.map((s) => [s.day_no, s.status]));
-
+  // ---------- day list ----------
   const list = el('nav', 'daylist');
-  for (const d of days) {
+  list.append(el('h2', 'listhead', 'All days'));
+  for (const d of daySummaries(db)) {
     const a = el('a', 'daycard');
     a.href = '#/day/' + d.day_no;
     const title = d.day_no === 0 ? 'Nightly' : 'Day ' + d.day_no;
-    a.append(el('div', 'daycard-title', title));
+    const row = el('div', 'daycard-row');
+    row.append(el('div', 'daycard-title', title));
+    if (d.openStatus === 'in_progress') row.append(el('span', 'chip chip-in_progress', 'in progress'));
+    else if (d.daysAgo === 0) row.append(el('span', 'chip chip-complete', 'done today'));
+    else if (d.day_no === next.day_no) row.append(el('span', 'chip chip-bias', 'next up'));
+    a.append(row);
     a.append(el('div', 'daycard-sub', d.name));
-    const st = statusByDay.get(d.day_no);
-    if (st) a.append(el('span', 'chip chip-' + st, st.replace('_', ' ')));
+    a.append(el('div', 'daycard-meta',
+      d.daysAgo == null ? 'never' : d.daysAgo === 0 ? 'today'
+        : d.daysAgo === 1 ? 'yesterday' : d.daysAgo + ' days ago'));
     list.append(a);
   }
   root.append(list);
 
+  // ---------- data ----------
   const data = el('section', 'datasec');
   data.append(el('h2', null, 'Data'));
   const row = el('div', 'btnrow');
@@ -104,8 +190,7 @@ export function renderHome(root) {
       return;
     }
     try {
-      const bytes = new Uint8Array(await file.files[0].arrayBuffer());
-      await importBytes(bytes);
+      await importBytes(new Uint8Array(await file.files[0].arrayBuffer()));
       alert('Import complete.');
       renderHome(root);
     } catch (err) {
@@ -121,20 +206,12 @@ export function renderHome(root) {
   data.append(testLink);
   root.append(data);
 
-  const counts = {
-    ex: query('SELECT COUNT(*) c FROM exercise')[0].c,
-    days: query('SELECT COUNT(*) c FROM day_template')[0].c,
-    sets: query('SELECT COUNT(*) c FROM set_log')[0].c,
-  };
-  const vol = query(
-    'SELECT COALESCE(SUM(reps_done),0) reps, COALESCE(SUM(hold_seconds_done),0) holds, ' +
-    'COALESCE(SUM(weight_lb*reps_done),0) tonnage FROM set_log')[0];
-  const nightly = query('SELECT COUNT(*) c FROM nightly_log')[0].c;
-  const power = Math.round(counts.sets * 100 + vol.reps * 10 + vol.holds * 5 + vol.tonnage / 10 + nightly * 50);
+  // ---------- footer ----------
+  const streak = nightlyStreak(db);
   const foot = el('footer', 'foot');
-  foot.append(el('p', 'powerline',
-    '⚡ Power level: ' + power.toLocaleString() + (power > 9000 ? " — IT'S OVER 9,000!" : '')));
-  foot.append(el('p', 'muted', counts.ex + ' exercises · ' + counts.days + ' templates · ' + counts.sets + ' sets logged'));
+  if (streak) foot.append(el('p', 'streakline', '🌙 Nightly streak: ' + streak + (streak === 1 ? ' night' : ' nights')));
+  foot.append(el('p', 'muted',
+    query('SELECT COUNT(*) c FROM exercise')[0].c + ' exercises · ' + setCount + ' sets logged'));
   const storageLine = el('p', 'muted', 'storage: checking…');
   foot.append(storageLine);
   storageStatus().then((p) => {

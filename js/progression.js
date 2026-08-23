@@ -249,6 +249,16 @@ export function computeFlags(db, sessionId) {
     if (!ex) continue;
     const currentLoad = rows(db,
       'SELECT * FROM current_load WHERE exercise_id = ? AND side = ?', [p.exercise_id, p.side])[0] || {};
+    // No approved load yet (nothing has been Accepted for this pair). Build the
+    // suggestion on what was actually lifted, not on zero — otherwise a first
+    // suggestion reads "hit every set... try 5 lb". Read-only: current_load is
+    // still written by Accept alone (§4.3).
+    if (currentLoad.weight_lb == null) {
+      const lifted = rows(db,
+        'SELECT MAX(weight_lb) w FROM set_log WHERE exercise_id = ? AND side = ? AND session_id = ?',
+        [p.exercise_id, p.side, sessionId])[0];
+      if (lifted && lifted.w != null) currentLoad.weight_lb = lifted.w;
+    }
     const baseTarget = rows(db,
       'SELECT t.reps, t.hold_seconds FROM block_target t JOIN block b ON b.id = t.block_id ' +
       "WHERE b.exercise_id = ? AND t.side = ? AND b.block_code <> 'warmup' ORDER BY b.order_index LIMIT 1",
@@ -306,9 +316,12 @@ function isSuppressed(db, flag, sessions) {
 
 // ---------- decisions (§4.3) ----------
 
+// A snoozed flag is still live — it is shown and can be decided (§4.3).
+const DECIDABLE = ['pending', 'snoozed'];
+
 export function acceptFlag(db, flagId) {
   const f = rows(db, 'SELECT * FROM progression_flag WHERE id = ?', [flagId])[0];
-  if (!f || f.status !== 'pending') return;
+  if (!f || !DECIDABLE.includes(f.status)) return;
   const now = new Date().toISOString();
   const cl = rows(db, 'SELECT * FROM current_load WHERE exercise_id=? AND side=?',
     [f.exercise_id, f.side])[0] || {};
@@ -340,14 +353,19 @@ export function acceptFlag(db, flagId) {
   db.run("UPDATE progression_flag SET status='accepted', decided_at=? WHERE id=?", [now, flagId]);
 }
 
+// Apply several at once (the home screen's "Accept all").
+export function acceptAll(db, flagIds) {
+  for (const id of flagIds) acceptFlag(db, id);
+}
+
 export function declineFlag(db, flagId) {
-  db.run("UPDATE progression_flag SET status='declined', decided_at=? WHERE id=?",
+  db.run("UPDATE progression_flag SET status='declined', decided_at=? WHERE id=? AND status IN ('pending','snoozed')",
     [new Date().toISOString(), flagId]);
 }
 
 // Snooze: decided, but not suppressed — it comes back next session.
 export function snoozeFlag(db, flagId) {
-  db.run("UPDATE progression_flag SET status='snoozed', decided_at=? WHERE id=?",
+  db.run("UPDATE progression_flag SET status='snoozed', decided_at=? WHERE id=? AND status='pending'",
     [new Date().toISOString(), flagId]);
 }
 

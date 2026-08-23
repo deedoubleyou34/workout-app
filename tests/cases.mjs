@@ -6,8 +6,9 @@
 // ctx: { check(name, ok, detail), eq(name, got, want), initSqlJs, loadSchema() }
 
 import { ruleFor, isSessionHit, trailingStreak, evaluate,
-         computeFlags, acceptFlag, declineFlag, pendingFlags } from '../js/progression.js';
+         computeFlags, acceptFlag, acceptAll, declineFlag, snoozeFlag, pendingFlags } from '../js/progression.js';
 import { seed } from '../js/seed.js';
+import { nextDayUp, startOver, currentSession, finishSession } from '../js/sessions.js';
 
 const EX = {
   slRdl:      { id: 1, name: 'Single-leg RDL (DB)', category: 'strength',   load_type: 'dumbbell',   is_timed: 0, increment_value: 5,  increment_unit: 'lb' },
@@ -233,4 +234,107 @@ export async function run(ctx) {
     eq('Declined flag can return after two fresh clean sessions', pendingFlags(db).length, 1);
     db.close();
   }
+
+  // 15. first-ever suggestion builds on the weight actually lifted, not zero.
+  // Regression: with no current_load row this used to read "try 5 lb".
+  {
+    const db = freshDb();
+    const exId = idOf(db, 'Single-leg RDL (DB)');
+    const blockId = mainBlock(db, exId);
+    for (let i = 1; i <= 2; i++) {
+      logSession(db, i, '2026-08-0' + i,
+        [{ block_id: blockId, exercise_id: exId, side: 'left', set_index: 1, weight_lb: 45, reps_done: 8, target_reps: 8 }]);
+      computeFlags(db, i);
+    }
+    const f = pendingFlags(db)[0];
+    eq('first suggestion builds on the logged weight (45 -> 50), not on zero',
+      [f && f.suggested_value, f && f.suggested_unit], [50, 'lb']);
+    db.close();
+  }
+
+  // 16. Accept works on a snoozed flag. Regression: acceptFlag ignored anything
+  // that was not status='pending', so Accept on a snoozed card did nothing.
+  {
+    const db = freshDb();
+    const exId = idOf(db, 'Single-leg RDL (DB)');
+    const blockId = mainBlock(db, exId);
+    for (let i = 1; i <= 2; i++) {
+      logSession(db, i, '2026-08-0' + i,
+        [{ block_id: blockId, exercise_id: exId, side: 'left', set_index: 1, weight_lb: 45, reps_done: 8, target_reps: 8 }]);
+      computeFlags(db, i);
+    }
+    const f = pendingFlags(db)[0];
+    snoozeFlag(db, f.id);
+    eq('snoozed flag is still shown', pendingFlags(db).length, 1);
+    acceptFlag(db, f.id);
+    eq('Accept applies a snoozed flag',
+      scalar(db, "SELECT weight_lb FROM current_load WHERE exercise_id=? AND side='left'", [exId]), 50);
+    db.close();
+  }
+
+  // 17. Accept all applies every applicable suggestion at once
+  {
+    const db = freshDb();
+    const exId = idOf(db, 'Single-leg RDL (DB)');
+    const blockId = mainBlock(db, exId);
+    for (let i = 1; i <= 2; i++) {
+      logSession(db, i, '2026-08-0' + i, [
+        { block_id: blockId, exercise_id: exId, side: 'left',  set_index: 1, weight_lb: 45, reps_done: 8, target_reps: 8 },
+        { block_id: blockId, exercise_id: exId, side: 'right', set_index: 1, weight_lb: 35, reps_done: 8, target_reps: 8 },
+      ]);
+      computeFlags(db, i);
+    }
+    const ids = pendingFlags(db).filter((f) => f.suggested_unit).map((f) => f.id);
+    acceptAll(db, ids);
+    eq('Accept all moves both sides on their own ladders',
+      [scalar(db, "SELECT weight_lb FROM current_load WHERE exercise_id=? AND side='left'", [exId]),
+       scalar(db, "SELECT weight_lb FROM current_load WHERE exercise_id=? AND side='right'", [exId])],
+      [50, 40]);
+    db.close();
+  }
+
+  // 18. an abandoned session never reaches the engine
+  {
+    const db = freshDb();
+    const exId = idOf(db, 'Single-leg RDL (DB)');
+    const blockId = mainBlock(db, exId);
+    const set = (sid) => ({ block_id: blockId, exercise_id: exId, side: 'left', set_index: 1,
+      weight_lb: 45, reps_done: 8, target_reps: 8, sid });
+    logSession(db, 1, '2026-08-01', [set(1)]);
+    computeFlags(db, 1);
+    // second clean session, but started over instead of finished
+    db.run("INSERT INTO session (id, date, day_no, status) VALUES (2, ?, 4, 'in_progress')", [todayStr()]);
+    db.run('INSERT INTO set_log (session_id, block_id, exercise_id, side, set_index, weight_lb, reps_done, ' +
+      'target_reps, hit_target, logged_at) VALUES (2,?,?,?,1,45,8,8,1,?)',
+      [blockId, exId, 'left', todayStr()]);
+    startOver(db, 4);
+    eq('starting over abandons the old session',
+      scalar(db, 'SELECT status FROM session WHERE id = 2'), 'abandoned');
+    eq('a fresh empty session is open', currentSession(db, 4).status, 'in_progress');
+    const fresh = currentSession(db, 4);
+    finishSession(db, fresh.id);
+    computeFlags(db, fresh.id);
+    eq('abandoned work earns no suggestion', pendingFlags(db).length, 0);
+    db.close();
+  }
+
+  // 19. next day up cycles 1 -> 2 -> 3 -> 4 -> 1 and ignores nightly
+  {
+    const db = freshDb();
+    eq('with no history, Day 1 is up first', nextDayUp(db).day_no, 1);
+    db.run("INSERT INTO session (date, day_no, status) VALUES ('2026-08-01', 1, 'complete')");
+    eq('after Day 1 -> Day 2', nextDayUp(db).day_no, 2);
+    db.run("INSERT INTO session (date, day_no, status) VALUES ('2026-08-04', 4, 'complete')");
+    eq('after Day 4 -> wraps to Day 1', nextDayUp(db).day_no, 1);
+    db.run("INSERT INTO session (date, day_no, status) VALUES ('2026-08-05', 0, 'complete')");
+    eq('nightly does not change what is next', nextDayUp(db).day_no, 1);
+    db.run("INSERT INTO session (date, day_no, status) VALUES ('2026-08-06', 2, 'abandoned')");
+    eq('an abandoned day does not advance the cycle', nextDayUp(db).day_no, 1);
+    db.close();
+  }
+}
+
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
