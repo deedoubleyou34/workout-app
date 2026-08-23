@@ -92,6 +92,16 @@ Do not scaffold future phases "while you're in there." The gates exist because i
 
 Running record of audit findings and decisions made as phases progress. Newest first. Add an entry whenever a phase surfaces something that changes the plan, the spec, or how we work.
 
+### 2026-08-22 — Phase 2 built: progression rule engine (build 009)
+
+- **`current_load` gained a `reps` column (migration v3).** Spec §3 gives current_load weight/band/hold only, but §4.2 progresses band work (+1 rep to +3, then band step) and knee/tibialis work (+2 reps to +6, then vest) by REPS. The approved rep target had nowhere to live. `reps` is the approved working target; the seed is never rewritten, and `block_target` stays the prescription.
+- **Flag vocabulary extended** beyond the schema comment: `flag` adds `add_load` (hold at the 120 s ceiling, band at +3, knee at +6) and `review` (power work — quality-gated, no auto-progression); `status` adds `snoozed` (decided but deliberately not suppressed, so it returns next session).
+- **Decline suppression rule:** a declined flag does not re-raise the next session, and returns only once the streak that triggers it *starts after* the decline — i.e. two fresh clean sessions. Snooze skips suppression by design.
+- **Sled is checked before the power category** in `ruleFor`. Heavy sled push/march are `category='power'` but §4.2 gives sled its own row (+10 lb, distance fixed); category-first ordering would have made them un-progressable.
+- **Tests run two ways from one source.** `tests/cases.mjs` holds every case; `tests/test.html` runs it in Safari (the actual gate) and `tools/run_tests.mjs` runs it in Node so a broken rule cannot reach a deploy. 34 assertions.
+- **A test fixture, not the engine, was wrong first:** the right side missing both sessions legitimately earns a `hold` flag per §4.1, so a "clean session" fixture that misses on one side produces two flags, not one. Worth remembering when reading §4 — `hold` is a note, not a load change, and it coexists with the other side's `increase`.
+- `tools/verify_migration.mjs` now pulls **both** `seed.js` and `schema.sql` from the v1 commit. Building the historical DB with today's schema hid the v3 `ALTER TABLE` (duplicate column) and would have masked a real migration bug.
+
 ### 2026-08-22 — Day reorder + UI restructure (build 008, Dom's direction)
 
 Dom's calls, applied to `workout_plan.txt` (source of truth), the seed, and the UI:

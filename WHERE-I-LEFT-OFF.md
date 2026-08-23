@@ -1,6 +1,6 @@
 # Where I left off — Training Companion
 
-**Last updated:** 2026-08-22 · **Live build:** 008 · **Status:** Phase 1 built and deployed, exit gate partly confirmed. Phase 2 NOT started (Dom's instruction).
+**Last updated:** 2026-08-22 · **Live build:** 009 · **Status:** Phase 1 confirmed except the DBeaver step (deferred, needs a PC). Phase 2 built and deployed; awaiting Dom's gate run on the iPhone.
 
 ---
 
@@ -72,18 +72,38 @@ Both pass. Day 1 estimated duration is 110.5 min, inside the plan's 100–115 wi
 
 ## Open questions for Dom
 
-1. **Side plank with abduction (Day 2)** — the plan says "right side extra … 3×10 reps/side," which is ambiguous. Seeded as **right 3×10 / left 2×10** to match the right-glute-med bias rule. Change it if you meant 3×10 both sides.
+1. ~~Side plank with abduction (Day 2)~~ — **confirmed correct** by Dom 2026-08-22: right 3×10 / left 2×10.
 2. Sled/carry distances log through the reps field labeled "Distance (m)" — `set_log` has no distance column, so a meter is stored as a rep against a meter target.
 3. Nightly drills log one value per side per night (habit tracker, per the schema's unique constraint), not per-set.
 4. Should "next" auto-advance to the first **unlogged** exercise instead of strict order?
 
 ---
 
-## Next up — Phase 2 (not started)
+## Phase 2 — Built and deployed (build 009), gate not yet run
 
-Progression rule engine per spec §4: evaluate `(exercise_id, side)` after every completed session — 2 consecutive session hits → `increase` flag; 1 miss → nothing; 2 consecutive misses → `hold`; 3 → `reduce`. Suggestions are written as `progression_flag` rows with `status='pending'` and are **never auto-applied**; only an explicit Accept writes `current_load`. Warm-up and mobility blocks are excluded from progression entirely. Goal is correctness against fabricated history proven by tests in `tests/test.html`, with zero UI polish.
+`js/progression.js` implements spec §4 as pure functions (`ruleFor`, `isSessionHit`, `trailingStreak`, `evaluate`) with a thin SQL layer that gathers history and writes `progression_flag`. Two clean sessions → `increase`; one miss → nothing; two → `hold`; three → `reduce`. Warm-up blocks and the mobility category never progress. Suggestions are surfaced only — **Accept is the sole path that writes `current_load`**.
 
-**Carry into Phase 2:** the `controllerchange` auto-reload in `js/main.js` must be deferred while a session is in progress — an update must never reload the app mid-set.
+Extra rule detail worth knowing:
+- **`add_load`** fires instead of `increase` at the ceilings: a hold at 120 s, a band at +3 reps, knee/tibialis work at +6 reps. **`review`** is what power work gets — no numbers, just a quality note.
+- **Decline** suppresses that flag until the triggering streak starts *after* the decline (two fresh clean sessions). **Snooze** deliberately skips suppression, so it returns next session.
+- Sled is matched before the `power` category in `ruleFor` — sled push/march are `category='power'` but §4.2 gives sled +10 lb.
+
+**Migration v3** added `current_load.reps` (the approved rep target) — §4.2 progresses band and knee work by reps and the original schema had nowhere to put it.
+
+**Tests:** `tests/cases.mjs` is the single source; `tests/test.html` runs it in Safari (the gate) and `tools/run_tests.mjs` runs the same 34 assertions in Node. All passing locally.
+
+### Phase 2 exit gate — Dom's part
+- [ ] Open **Run progression tests →** at the bottom of the home screen (or `/tests/test.html`) **in Safari on the iPhone** — must show ALL 34 TESTS PASSED
+- [ ] Log two clean sessions on something loaded, Finish session each time → suggestion appears on home
+- [ ] Accept → next session's prefilled weight reflects the new load
+- [ ] Decline → `current_load` unchanged and the flag does not come back next session
+- [ ] Read the generated reason strings and confirm they make sense in plain English
+
+**Carry into Phase 3:** the `controllerchange` auto-reload in `js/main.js` must be deferred while a session is in progress — an update must never reload the app mid-set.
+
+## Next up — Phase 3 (not started)
+
+Session runner, silent: the state machine that walks blocks in order, runs rest timers off `Date.now()` deltas (never `setInterval` tick counts — iOS throttles background timers), holds a screen wake lock, and recovers if the app is killed mid-session. No audio yet.
 
 ## Deploy loop (for whoever picks this up)
 
