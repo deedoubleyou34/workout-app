@@ -1,4 +1,5 @@
-import { query, exec } from '../db.js';
+import { query, exec, getDb, persist } from '../db.js';
+import { computeFlags } from '../progression.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -47,8 +48,27 @@ function sectionKey(block) {
 function targetText(t, isTimed) {
   const side = t.side === 'both' ? '' : t.side[0].toUpperCase() + ' ';
   if (t.distance_m) return side + t.sets + '×' + t.distance_m + 'm';
-  if (isTimed || t.hold_seconds) return side + t.sets + '×' + (t.hold_seconds || '?') + 's';
-  return side + t.sets + '×' + t.reps;
+  if (isTimed || t.hold_seconds) return side + t.sets + '×' + (effHold(t) || '?') + 's';
+  return side + t.sets + '×' + effReps(t);
+}
+
+// Accepted progression suggestions live in current_load and override the
+// seeded target. The seed itself is never rewritten (§4.3).
+const loadByPair = new Map();   // exercise_id|side -> current_load row
+function loadFor(exerciseId, side) {
+  return loadByPair.get(exerciseId + '|' + side) || {};
+}
+function effReps(t) {
+  return t._load && t._load.reps != null ? t._load.reps : t.reps;
+}
+function effHold(t) {
+  return t._load && t._load.hold_seconds != null ? t._load.hold_seconds : t.hold_seconds;
+}
+function progressed(t, isTimed) {
+  if (!t._load) return false;
+  return isTimed || t.hold_seconds
+    ? (t._load.hold_seconds != null && t._load.hold_seconds !== t.hold_seconds)
+    : (t._load.reps != null && t._load.reps !== t.reps);
 }
 
 // per-day view position (section + exercise index), survives re-renders after saves
@@ -84,6 +104,11 @@ export function renderDay(root, dayNo) {
   let sec = sections.find((s) => s.key === st.section);
   if (st.idx >= sec.blocks.length) st.idx = sec.blocks.length - 1;
   viewState.set(dayNo, st);
+
+  loadByPair.clear();
+  for (const cl of query('SELECT * FROM current_load')) {
+    loadByPair.set(cl.exercise_id + '|' + cl.side, cl);
+  }
 
   let session = null;
   const setLogs = new Map();   // block_id|side|set_index -> row
@@ -143,6 +168,12 @@ export function renderDay(root, dayNo) {
       fin.onclick = async () => {
         await exec("UPDATE session SET status='complete', ended_at=? WHERE id=?",
           [new Date().toISOString(), session.id]);
+        const flags = computeFlags(getDb(), session.id);
+        await persist();
+        if (flags.length) {
+          alert(flags.length + (flags.length === 1 ? ' suggestion' : ' suggestions')
+            + ' waiting on the home screen.');
+        }
         renderDay(root, dayNo);
       };
       titleRow.append(fin);
@@ -197,6 +228,7 @@ export function renderDay(root, dayNo) {
   const stack = el('div', 'cardstack');
 
   const targets = query('SELECT * FROM block_target WHERE block_id = ? ORDER BY id', [b.id]);
+  for (const t of targets) t._load = loadFor(b.exercise_id, t.side);
   const ordered = b.bias_side
     ? [...targets].sort((a, c) => (a.side === b.bias_side ? -1 : c.side === b.bias_side ? 1 : 0))
     : targets;
@@ -295,11 +327,14 @@ export function renderDay(root, dayNo) {
     const fields = el('div', 'fields');
     let wIn, bandIn;
 
+    // Approved load (an accepted suggestion) wins over whatever was last logged.
+    const approved = loadFor(block.exercise_id, target.side);
+
     if (showWeight) {
       wIn = document.createElement('input');
       wIn.type = 'number'; wIn.inputMode = 'decimal'; wIn.step = '2.5'; wIn.min = '0';
       wIn.placeholder = 'weight lb';
-      const prev2 = existing?.weight_lb ?? query(
+      const prev2 = existing?.weight_lb ?? approved.weight_lb ?? query(
         'SELECT weight_lb FROM set_log WHERE exercise_id=? AND side=? AND weight_lb IS NOT NULL ORDER BY id DESC LIMIT 1',
         [block.exercise_id, target.side])[0]?.weight_lb;
       if (prev2 != null) wIn.value = prev2;
@@ -308,7 +343,7 @@ export function renderDay(root, dayNo) {
     if (showBand) {
       bandIn = document.createElement('input');
       bandIn.type = 'text'; bandIn.placeholder = 'band (color/lb)';
-      const prev2 = existing?.band_level ?? query(
+      const prev2 = existing?.band_level ?? approved.band_level ?? query(
         'SELECT band_level FROM set_log WHERE exercise_id=? AND side=? AND band_level IS NOT NULL ORDER BY id DESC LIMIT 1',
         [block.exercise_id, target.side])[0]?.band_level;
       if (prev2 != null) bandIn.value = prev2;
@@ -318,12 +353,14 @@ export function renderDay(root, dayNo) {
     const mainIn = document.createElement('input');
     mainIn.type = 'number'; mainIn.inputMode = 'numeric'; mainIn.min = '0';
     const mainLabel = isDist ? 'Distance (m)' : isTimed ? 'Hold (seconds)' : 'Reps';
+    const tgtHold = effHold(target);
+    const tgtReps = effReps(target);
     if (isNightly) {
-      mainIn.value = existing?.value ?? (target.hold_seconds || target.reps || '');
+      mainIn.value = existing?.value ?? (tgtHold || tgtReps || '');
     } else if (existing) {
       mainIn.value = existing.hold_seconds_done != null ? existing.hold_seconds_done : existing.reps_done;
     } else {
-      mainIn.value = isDist ? target.distance_m : isTimed ? target.hold_seconds : target.reps;
+      mainIn.value = isDist ? target.distance_m : isTimed ? tgtHold : tgtReps;
     }
     fields.append(label(mainLabel, mainIn));
     sheet.append(fields);
@@ -342,9 +379,9 @@ export function renderDay(root, dayNo) {
         );
       } else {
         const s = await getOrCreateSession();
-        const targetReps = isDist ? target.distance_m : target.reps;
+        const targetReps = isDist ? target.distance_m : tgtReps;
         const hit = isTimed
-          ? (val >= (target.hold_seconds || 0) ? 1 : 0)
+          ? (val >= (tgtHold || 0) ? 1 : 0)
           : (val >= (targetReps || 0) ? 1 : 0);
         // set_log is append-only: a re-log of the same set is a new row + note
         await exec(
@@ -357,7 +394,7 @@ export function renderDay(root, dayNo) {
             isTimed ? null : val,
             isTimed ? val : null,
             isTimed ? null : targetReps,
-            isTimed ? target.hold_seconds : null,
+            isTimed ? tgtHold : null,
             hit,
             existing ? 'correction of earlier entry' : null,
             new Date().toISOString()]

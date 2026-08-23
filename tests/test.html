@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Progression tests</title>
+  <style>
+    body { background:#070a14; color:#f2f4ff; font:16px -apple-system,system-ui,sans-serif;
+           margin:0; padding:calc(env(safe-area-inset-top) + 16px) 14px 60px; }
+    h1 { font-size:1.3rem; font-style:italic; text-transform:uppercase; color:#ffd75e; }
+    #summary { font-size:1.1rem; font-weight:800; margin:12px 0; padding:12px; border-radius:10px; }
+    .ok { background:#12301c; color:#5ee08a; }
+    .bad { background:#3a1414; color:#ff6b4a; }
+    ul { padding:0; }
+    li { margin:6px 0; line-height:1.35; list-style:none; font-size:0.95rem; }
+    .p::before { content:'PASS '; color:#5ee08a; font-weight:800; }
+    .f::before { content:'FAIL '; color:#ff6b4a; font-weight:800; }
+    .f { color:#ff9a86; }
+    .detail { display:block; color:#8b93ad; font-size:0.8rem; margin-left:8px; }
+    a { color:#57c7ff; }
+  </style>
+</head>
+<body>
+  <h1>Progression tests</h1>
+  <p><a href="../index.html">‹ back to app</a></p>
+  <div id="summary">running…</div>
+  <ul id="results"></ul>
+
+  <script src="../vendor/sql-wasm.js"></script>
+  <script type="module">
+import { run } from './cases.mjs';
+
+const results = document.getElementById('results');
+const summary = document.getElementById('summary');
+let pass = 0, fail = 0;
+
+function check(name, ok, detail) {
+  const li = document.createElement('li');
+  li.className = ok ? 'p' : 'f';
+  li.textContent = name;
+  if (detail && !ok) {
+    const d = document.createElement('span');
+    d.className = 'detail';
+    d.textContent = detail;
+    li.append(d);
+  }
+  results.append(li);
+  if (ok) pass++; else fail++;
+}
+const eq = (name, got, want) =>
+  check(name, JSON.stringify(got) === JSON.stringify(want),
+    'got ' + JSON.stringify(got) + ', wanted ' + JSON.stringify(want));
+
+try {
+  await run({
+    check, eq,
+    initSqlJs: () => window.initSqlJs({ locateFile: (f) => '../vendor/' + f }),
+    loadSchema: () => fetch('../js/schema.sql').then((r) => r.text()),
+  });
+  summary.className = fail === 0 ? 'ok' : 'bad';
+  summary.textContent = fail === 0
+    ? 'ALL ' + pass + ' TESTS PASSED'
+    : fail + ' FAILED / ' + (pass + fail) + ' total';
+} catch (err) {
+  summary.className = 'bad';
+  summary.textContent = 'CRASHED: ' + err.message;
+}
+  </script>
+</body>
+</html>

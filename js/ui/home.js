@@ -1,4 +1,5 @@
-import { query, storageStatus, exportSqliteBlob, exportJsonBlob, importBytes } from '../db.js';
+import { query, storageStatus, exportSqliteBlob, exportJsonBlob, importBytes, getDb, persist } from '../db.js';
+import { pendingFlags, acceptFlag, declineFlag, snoozeFlag } from '../progression.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -27,6 +28,40 @@ export function renderHome(root) {
   const header = el('header', 'top');
   header.append(el('h1', null, 'Training Companion'));
   root.append(header);
+
+  // ---------- pending progression flags (§4.3: surfaced, never applied) ----------
+  const flags = pendingFlags(getDb());
+  if (flags.length) {
+    const sec = el('section', 'flagsec');
+    sec.append(el('h2', null, flags.length === 1 ? '1 suggestion' : flags.length + ' suggestions'));
+    for (const f of flags) {
+      const card = el('div', 'flagcard flag-' + f.flag);
+      const head = el('div', 'flaghead');
+      head.append(el('span', 'flagkind', f.flag.replace('_', ' ')));
+      if (f.side !== 'both') head.append(el('span', 'chip chip-bias', f.side));
+      if (f.status === 'snoozed') head.append(el('span', 'chip', 'snoozed'));
+      card.append(head);
+      card.append(el('p', 'flagreason', f.reason));
+
+      const row = el('div', 'btnrow');
+      const decide = (fn, label) => {
+        const btn = el('button', 'btn btn-small' + (label === 'Accept' ? ' btn-primary' : ''), label);
+        btn.onclick = async () => {
+          fn(getDb(), f.id);
+          await persist();
+          renderHome(root);
+        };
+        return btn;
+      };
+      // 'hold' and 'review' carry no value to apply — acknowledging is the action.
+      if (f.suggested_unit) row.append(decide(acceptFlag, 'Accept'));
+      row.append(decide(declineFlag, f.suggested_unit ? 'Decline' : 'Got it'));
+      if (f.status !== 'snoozed') row.append(decide(snoozeFlag, 'Snooze'));
+      card.append(row);
+      sec.append(card);
+    }
+    root.append(sec);
+  }
 
   const days = query(
     'SELECT * FROM day_template ORDER BY CASE day_no WHEN 0 THEN 99 ELSE day_no END'
@@ -81,6 +116,9 @@ export function renderHome(root) {
 
   row.append(expSql, expJson, imp, file);
   data.append(row);
+  const testLink = el('a', 'testlink', 'Run progression tests →');
+  testLink.href = 'tests/test.html';
+  data.append(testLink);
   root.append(data);
 
   const counts = {

@@ -86,6 +86,8 @@ CREATE TABLE current_load (                 -- the APPROVED working load
   weight_lb    REAL,
   band_level   TEXT,
   hold_seconds INTEGER,
+  reps         INTEGER,                     -- approved rep target; band/knee work
+                                            -- progresses by reps before load (§4.2)
   updated_at   TEXT NOT NULL,
   PRIMARY KEY (exercise_id, side)
 );
@@ -95,11 +97,11 @@ CREATE TABLE progression_flag (
   created_session_id  INTEGER NOT NULL REFERENCES session(id),
   exercise_id         INTEGER NOT NULL REFERENCES exercise(id),
   side                TEXT NOT NULL,
-  flag                TEXT NOT NULL,        -- increase | hold | reduce
+  flag                TEXT NOT NULL,        -- increase | hold | reduce | add_load | review
   suggested_value     REAL,
-  suggested_unit      TEXT,
+  suggested_unit      TEXT,                 -- lb | sec | rep | band_step | vest
   reason              TEXT NOT NULL,        -- human-readable, shown in UI
-  status              TEXT NOT NULL,        -- pending | accepted | declined
+  status              TEXT NOT NULL,        -- pending | accepted | declined | snoozed
   decided_at          TEXT
 );
 

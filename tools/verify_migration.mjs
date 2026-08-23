@@ -4,7 +4,7 @@
 // (day, exercise, block_code) it was logged under.
 // Usage: node tools/verify_migration.mjs
 import { createRequire } from 'module';
-import { readFileSync, writeFileSync, mkdtempSync } from 'fs';
+import { writeFileSync, mkdtempSync } from 'fs';
 import { execSync } from 'child_process';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -22,7 +22,9 @@ const { seed: seedV1 } = await import(pathToFileURL(join(tmp, 'seed_v1.mjs')).hr
 
 const SQL = await initSqlJs({ locateFile: (f) => 'vendor/' + f });
 const db = new SQL.Database();
-db.run(readFileSync('js/schema.sql', 'utf8'));
+// the schema as it was at v1 too — later migrations add columns to it, so
+// starting from today's schema would hide (or falsely fail) those steps
+db.run(execSync('git show ' + V1_COMMIT + ':js/schema.sql', { encoding: 'utf8' }));
 seedV1(db);
 db.run("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '1')");
 
@@ -77,6 +79,12 @@ for (const r of rows) {
 }
 const dangling = all(
   'SELECT COUNT(*) c FROM set_log WHERE block_id NOT IN (SELECT id FROM block)')[0].c;
+// v3 adds current_load.reps to an existing DB — prove the column landed
+const hasReps = all("PRAGMA table_info(current_load)").some((c) => c.name === 'reps');
+if (!hasReps) {
+  console.log('MIGRATION VERIFICATION FAILED: current_load.reps missing after migration');
+  process.exit(1);
+}
 console.log(rows.length + ' logged sets checked, ' + bad + ' mismatched, ' + dangling + ' dangling block refs');
 if (bad || dangling || rows.length !== oldBlocks.length) {
   console.log('MIGRATION VERIFICATION FAILED');

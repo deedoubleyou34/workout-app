@@ -69,6 +69,36 @@ html, body {
 .titlerow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .titlerow .btn-small { margin-top: 0; }
 
+.flagsec { margin-bottom: 20px; }
+.flagsec h2 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--gold);
+  margin-bottom: 8px;
+}
+.flagcard {
+  background: var(--card);
+  border: 1px solid var(--edge);
+  border-left: 3px solid var(--gold);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.flagcard.flag-hold, .flagcard.flag-review { border-left-color: var(--ki); }
+.flagcard.flag-reduce { border-left-color: var(--miss); }
+.flaghead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.flagkind {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--gold);
+}
+.flag-hold .flagkind, .flag-review .flagkind { color: var(--ki); }
+.flag-reduce .flagkind { color: var(--miss); }
+.flagreason { font-size: 0.9rem; line-height: 1.4; }
+
 .daylist { display: flex; flex-direction: column; gap: 10px; }
 .daycard {
   display: block;
@@ -272,4 +302,12 @@ html, body {
   padding: 8px 12px;
   font-size: 1.3rem;
   width: 100%;
+}
+
+.testlink {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--ki);
+  text-decoration: none;
+  font-size: 0.85rem;
 }

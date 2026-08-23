@@ -53,6 +53,16 @@ export const MIGRATIONS = [
       pairs.forEach(([, newId], i) => db.run('UPDATE set_log SET block_id=? WHERE block_id=?', [newId, -(i + 1)]));
     },
   },
+  {
+    // v3 (build 009, Phase 2): current_load gains `reps` — the approved working
+    // rep target. Spec §3 has weight/band/hold but §4.2 progresses band and
+    // knee/tibialis work by REPS (+1 to +3 then band step; +2 to +6 then vest),
+    // which the original schema could not express.
+    version: 3,
+    run(db) {
+      db.run('ALTER TABLE current_load ADD COLUMN reps INTEGER');
+    },
+  },
 ];
 const SCHEMA_VERSION = 1 + MIGRATIONS.length;
 
@@ -135,6 +145,12 @@ export async function initDb() {
 
 export async function persist() {
   await idbPut(IDB_KEY, db.export());
+}
+
+// Raw handle for modules that run their own SQL (progression.js). Anything that
+// writes through this must call persist() itself.
+export function getDb() {
+  return db;
 }
 
 export function query(sql, params = []) {
