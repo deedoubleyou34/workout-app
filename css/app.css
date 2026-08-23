@@ -385,3 +385,100 @@ html, body {
   text-decoration: none;
   font-size: 0.85rem;
 }
+
+/* ---------- session runner (Phase 3) ---------- */
+.runpage { padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
+.runtop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.runprogress {
+  flex: 1;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.lockdot { font-size: 0.65rem; color: var(--ki); white-space: nowrap; }
+.lockdot.lost { color: var(--miss); }
+.lockdot::before { content: '● '; }
+
+.runtrack {
+  height: 4px;
+  background: var(--edge);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.runfill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--orange), var(--gold));
+  box-shadow: 0 0 10px rgba(255, 215, 94, 0.6);
+  transition: width 0.25s;
+}
+
+.runcard {
+  background: var(--card);
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  padding: 18px 16px;
+  text-align: center;
+}
+.runside {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: var(--ki);
+}
+.runex {
+  font-size: 1.7rem;
+  font-weight: 800;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  margin: 6px 0;
+  color: var(--gold);
+  text-shadow: 0 0 16px rgba(255, 215, 94, 0.3);
+}
+.runset { color: var(--muted); font-size: 0.9rem; }
+.runtarget { font-size: 1.5rem; font-weight: 800; margin: 8px 0 12px; }
+.runcard .instruction, .runcard .feelcue { text-align: left; }
+.runcard .fields { margin-top: 14px; }
+
+.donebtn {
+  display: block;
+  width: 100%;
+  min-height: 76px;
+  margin-top: 16px;
+  font-size: 1.4rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.runnav { display: flex; justify-content: space-between; margin-top: 12px; }
+
+.restcard { padding: 28px 16px; }
+.restclock {
+  font-size: 4rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--ki);
+  text-shadow: 0 0 24px rgba(87, 199, 255, 0.4);
+  margin: 8px 0;
+}
+.restclock.done { color: var(--gold); text-shadow: 0 0 28px rgba(255, 215, 94, 0.6); }
+.restnext { margin-top: 10px; font-size: 0.95rem; }
+.missedlist { text-align: left; margin-top: 6px; }
+.missedlist li { list-style: none; color: var(--miss); font-size: 0.9rem; margin: 4px 0; }
+.nextmanual {
+  display: block;
+  text-align: center;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-decoration: none;
+}

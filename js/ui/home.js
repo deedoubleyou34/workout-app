@@ -59,9 +59,12 @@ export function renderHome(root) {
       : next.daysAgo === 0 ? 'last trained today'
       : next.daysAgo === 1 ? 'last trained yesterday'
       : 'last trained ' + next.daysAgo + ' days ago'));
-  const startBtn = el('a', 'btn btn-primary nextstart', 'Start Day ' + next.day_no);
-  startBtn.href = '#/day/' + next.day_no;
+  const startBtn = el('a', 'btn btn-primary nextstart', '▶  Run Day ' + next.day_no);
+  startBtn.href = '#/run/' + next.day_no;
   nextCard.append(startBtn);
+  const manual = el('a', 'nextmanual', 'or log it by hand');
+  manual.href = '#/day/' + next.day_no;
+  nextCard.append(manual);
   nextSec.append(nextCard);
   root.append(nextSec);
 

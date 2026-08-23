@@ -1,13 +1,16 @@
 import { initDb } from './db.js';
 import { renderHome } from './ui/home.js';
 import { renderDay } from './ui/day.js';
+import { renderRun } from './ui/run.js';
 
 const app = document.getElementById('app');
 
 function route() {
-  const m = location.hash.match(/^#\/day\/(\d+)/);
-  if (m) renderDay(app, Number(m[1]));
-  else renderHome(app);
+  const run = location.hash.match(/^#\/run\/(\d+)/);
+  if (run) return renderRun(app, Number(run[1]));
+  const day = location.hash.match(/^#\/day\/(\d+)/);
+  if (day) return renderDay(app, Number(day[1]));
+  return renderHome(app);
 }
 
 (async () => {
@@ -39,12 +42,20 @@ if ('serviceWorker' in navigator) {
     })
     .catch(() => {});
 
-  // When an updated service worker takes control, load the new shell.
-  // TODO(phase 2): defer this reload while a workout session is running.
+  // When an updated service worker takes control, load the new shell — but
+  // never mid-session. A reload during the runner would drop the wake lock and
+  // the rest timer; the update waits until the runner is left.
   let reloaded = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
+  let pendingReload = false;
+  const inSession = () => location.hash.startsWith('#/run/');
+  const applyUpdate = () => {
     if (reloaded) return;
+    if (inSession()) { pendingReload = true; return; }
     reloaded = true;
     location.reload();
+  };
+  navigator.serviceWorker.addEventListener('controllerchange', applyUpdate);
+  window.addEventListener('hashchange', () => {
+    if (pendingReload && !inSession()) applyUpdate();
   });
 }

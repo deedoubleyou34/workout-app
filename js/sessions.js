@@ -62,6 +62,43 @@ export function sessionSets(db, sessionId) {
   return rows(db, 'SELECT * FROM set_log WHERE session_id = ?', [sessionId]);
 }
 
+// The one place a set gets written. set_log is append-only: a re-log of the
+// same set is a new row carrying a note, never an UPDATE.
+export function logSet(db, s) {
+  db.run(
+    'INSERT INTO set_log (session_id, block_id, exercise_id, side, set_index, weight_lb, band_level, ' +
+    'reps_done, hold_seconds_done, target_reps, target_hold_seconds, hit_target, rpe, notes, logged_at) ' +
+    'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    [s.session_id, s.block_id, s.exercise_id, s.side, s.set_index,
+      s.weight_lb ?? null, s.band_level ?? null,
+      s.reps_done ?? null, s.hold_seconds_done ?? null,
+      s.target_reps ?? null, s.target_hold_seconds ?? null,
+      s.hit_target ? 1 : 0, s.rpe ?? null, s.notes ?? null,
+      new Date().toISOString()]);
+}
+
+// ---------- runner position (Phase 3) ----------
+// Persisted after every step so a killed app resumes at the exact set.
+
+export function saveRunnerState(db, state) {
+  db.run("INSERT OR REPLACE INTO meta (key, value) VALUES ('runner_state', ?)", [JSON.stringify(state)]);
+}
+
+export function loadRunnerState(db, sessionId) {
+  const r = rows(db, "SELECT value FROM meta WHERE key = 'runner_state'")[0];
+  if (!r) return null;
+  try {
+    const state = JSON.parse(r.value);
+    return state.session_id === sessionId ? state : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearRunnerState(db) {
+  db.run("DELETE FROM meta WHERE key = 'runner_state'");
+}
+
 // What each day looks like on the home list.
 export function daySummaries(db) {
   const days = rows(db,

@@ -175,15 +175,19 @@ export function renderDay(root, dayNo) {
     const controls = el('div', 'btnrow');
     const loggedCount = setLogs.size;
 
+    const run = el('a', 'btn btn-primary btn-small', session && loggedCount ? '▶ Resume runner' : '▶ Run session');
+    run.href = '#/run/' + dayNo;
+    controls.append(run);
+
     if (!session) {
-      const start = el('button', 'btn btn-primary btn-small', 'Start session');
+      const start = el('button', 'btn btn-small', 'Start session');
       start.onclick = async () => {
         await getOrCreateSession();
         renderDay(root, dayNo);
       };
       controls.append(start);
     } else if (session.status === 'in_progress') {
-      const fin = el('button', 'btn btn-primary btn-small', 'Finish session');
+      const fin = el('button', 'btn btn-small', 'Finish session');
       fin.onclick = async () => {
         const hits = query('SELECT COUNT(*) c FROM set_log WHERE session_id=? AND hit_target=1',
           [session.id])[0].c;

@@ -9,6 +9,7 @@ import { ruleFor, isSessionHit, trailingStreak, evaluate,
          computeFlags, acceptFlag, acceptAll, declineFlag, snoozeFlag, pendingFlags } from '../js/progression.js';
 import { seed } from '../js/seed.js';
 import { nextDayUp, startOver, currentSession, finishSession } from '../js/sessions.js';
+import { buildSteps, remainingSeconds, resumeIndex, progressOf } from '../js/runner.js';
 
 const EX = {
   slRdl:      { id: 1, name: 'Single-leg RDL (DB)', category: 'strength',   load_type: 'dumbbell',   is_timed: 0, increment_value: 5,  increment_unit: 'lb' },
@@ -331,6 +332,75 @@ export async function run(ctx) {
     db.run("INSERT INTO session (date, day_no, status) VALUES ('2026-08-06', 2, 'abandoned')");
     eq('an abandoned day does not advance the cycle', nextDayUp(db).day_no, 1);
     db.close();
+  }
+
+  // ---------- Phase 3: runner step ordering ----------
+
+  const blk = (o) => ({
+    id: o.id, block_code: o.code, superset_group: o.group || null,
+    rest_seconds_after: o.rest || 0, bias_side: o.bias || null,
+    exercise_id: o.id, ex_name: o.name, is_timed: o.timed ? 1 : 0,
+    load_type: 'dumbbell', instruction: 'x', feel_cue: 'y',
+    targets: o.targets,
+  });
+  const sig = (s) => s.kind === 'set'
+    ? s.label + ':' + s.side[0].toUpperCase() + s.setIndex
+    : s.kind === 'rest' ? 'rest' + s.seconds : 'summary';
+
+  // 20. biased side goes first, every round
+  {
+    const steps = buildSteps([blk({ id: 1, code: '1a', name: 'SL RDL', bias: 'left', rest: 90,
+      targets: [{ side: 'right', sets: 2, reps: 8 }, { side: 'left', sets: 2, reps: 8 }] })]);
+    eq('bias side is presented first in every round',
+      steps.map(sig), ['SL RDL:L1', 'SL RDL:R1', 'rest90', 'SL RDL:L2', 'SL RDL:R2', 'summary']);
+  }
+
+  // 21. asymmetric set counts: no 4th right set (spec "What done looks like")
+  {
+    const steps = buildSteps([blk({ id: 1, code: '2a', name: 'Step-up', bias: 'left', rest: 60,
+      targets: [{ side: 'left', sets: 3, reps: 8 }, { side: 'right', sets: 2, reps: 8 }] })]);
+    eq('the extra biased set runs alone, no phantom right set',
+      steps.map(sig),
+      ['Step-up:L1', 'Step-up:R1', 'rest60', 'Step-up:L2', 'Step-up:R2', 'rest60', 'Step-up:L3', 'summary']);
+  }
+
+  // 22. supersets alternate a -> b -> rest, for the larger set count
+  {
+    const steps = buildSteps([
+      blk({ id: 1, code: '1a', group: '1', name: 'Thrust', rest: 0, targets: [{ side: 'both', sets: 3, reps: 8 }] }),
+      blk({ id: 2, code: '1b', group: '1', name: 'Flexion', rest: 120, targets: [{ side: 'both', sets: 2, reps: 12 }] }),
+    ]);
+    eq('superset alternates and rest follows the pair',
+      steps.map(sig),
+      ['Thrust:B1', 'Flexion:B1', 'rest120', 'Thrust:B2', 'Flexion:B2', 'rest120', 'Thrust:B3', 'summary']);
+  }
+
+  // 23. no trailing rest at the very end of the session
+  {
+    const steps = buildSteps([blk({ id: 1, code: 'finisher', name: 'Wall sit', rest: 30, timed: true,
+      targets: [{ side: 'both', sets: 2, hold_seconds: 90 }] })]);
+    eq('session does not end on a rest step',
+      steps.map(sig), ['Wall sit:B1', 'rest30', 'Wall sit:B2', 'summary']);
+  }
+
+  // 24. resume lands on the first unlogged set, and rest is not replayed
+  {
+    const steps = buildSteps([blk({ id: 1, code: '1a', name: 'SL RDL', bias: 'left', rest: 90,
+      targets: [{ side: 'left', sets: 2, reps: 8 }, { side: 'right', sets: 2, reps: 8 }] })]);
+    const done = new Set(['SL RDL:L1', 'SL RDL:R1']);
+    const i = resumeIndex(steps, (s) => done.has(sig(s)));
+    eq('resumes at the first unlogged set, skipping the elapsed rest', sig(steps[i]), 'SL RDL:L2');
+    eq('progress counts logged sets only', progressOf(steps, i), { done: 2, total: 4 });
+  }
+
+  // 25. rest countdown is wall-clock, so a throttled/backgrounded app catches up
+  {
+    const started = 1000000;
+    eq('timer reads from Date.now() deltas, not tick counts',
+      [remainingSeconds(started, 90, started + 10000),
+       remainingSeconds(started, 90, started + 89999),
+       remainingSeconds(started, 90, started + 300000)],
+      [80, 1, 0]);
   }
 }
 
