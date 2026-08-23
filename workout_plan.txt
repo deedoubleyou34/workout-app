@@ -140,6 +140,19 @@ rest (e.g. Mon-Tue-Thu-Fri). Day 2 is the buffer between the two
 heavy lower days - Days 1 and 3 back-to-back stacks jump-shrug,
 sled and Nordic stress on the same tissue inside 24 hours.
 
+Block order within every day (updated 2026-08-22):
+1. Warm-up
+2. Knee/tendon block - moved BEFORE the main lifts as targeted
+   knee prep (KOT-style: sled drag and tibialis work prime the
+   knee before it gets loaded).
+3. Explosive pairs stay first among the main lifts - ballistic
+   work on fatigued tendons at the end of a session is exactly
+   what philosophy points 2 and 8 forbid.
+4. Unilateral before bilateral everywhere else - the weak side
+   works while fresh, the strong side cannot compensate, and
+   within each superset pair the single-leg/single-arm drill
+   goes first.
+
 =================================================================
 DAY 1 - SPRINT MECHANICS + HIP FLEXOR STRENGTH + LEFT ANKLE
 Target duration: 100-115 min
@@ -157,6 +170,14 @@ calves, tibialis)  [~18 min, rest 30s between drills]
 - Leg swings front/back + lateral: 12/side
 - Hip flexor activation - standing banded marches: 12/side
 
+KNEE / TIBIALIS BLOCK (knee prep - runs BEFORE the supersets)
+[rest 60s between sets, ~14 min]
+- Backward sled drag (light-moderate, continuous): 3x30m
+- Tibialis raise, loaded (band + ankle wrap or plate on toes):
+  3x20
+- ATG split squat, front foot on low board, left-biased:
+  4x8 left / 3x8 right
+
 MAIN - SUPERSET A  [rest 120s between rounds, ~15 min]
 1a. Trap bar deadlift jump-shrug: 5x4
 1b. Weighted hanging knee raise / hip flexor strength (add ankle
@@ -168,16 +189,9 @@ MAIN - SUPERSET B  [rest 90s between rounds, ~14 min]
     set: 4x12 left / 3x12 right
 
 MAIN - SUPERSET C  [rest 90s between rounds, ~16 min]
-3a. KB swings: 4x15
-3b. Copenhagen plank (adductor/pelvic stability), left extra:
+3a. Copenhagen plank (adductor/pelvic stability), left extra:
     4x60s left / 3x45s right
-
-KNEE / TIBIALIS BLOCK  [rest 60s between sets, ~14 min]
-- ATG split squat, front foot on low board, left-biased:
-  4x8 left / 3x8 right
-- Backward sled drag (light-moderate, continuous): 3x30m
-- Tibialis raise, loaded (band + ankle wrap or plate on toes):
-  3x20
+3b. KB swings: 4x15
 
 POWER / FORCE PRODUCTION  [rest 150s between efforts, ~15 min]
 - Heavy sled push: 6x20m
@@ -205,23 +219,24 @@ obliques/QL)  [~15 min, rest 30s between drills]
   2x8 right
 - Arm circles + cross-body swings: 12 each
 
+KNEE / TIBIALIS MAINTENANCE (runs BEFORE the supersets)
+[rest 60s between sets, ~12 min]
+- Reverse Nordic (kneeling, 4-count lower to tolerance): 3x8
+- Tibialis raise, back to wall: 3x25
+- Standing calf stretch, knee bent (soleus): 90s left / 60s right
+
 MAIN - SUPERSET A  [rest 90s between rounds, ~15 min]
 1a. Half-kneeling single-arm band row, left extra set:
     4x12 left / 3x12 right
 1b. Landmine press single arm, left-biased: 4x8 left / 3x8 right
 
 MAIN - SUPERSET B  [rest 75s between rounds, ~13 min]
-2a. DB scaption raise: 4x12
-2b. Face pulls with external rotation emphasis: 4x15
+2a. Serratus punch (banded): 4x12/side
+2b. Prone trap raise (light DB): 4x12
 
 MAIN - SUPERSET C  [rest 75s between rounds, ~13 min]
-3a. Prone trap raise (light DB): 4x12
-3b. Serratus punch (banded): 4x12/side
-
-KNEE / TIBIALIS MAINTENANCE  [rest 60s between sets, ~12 min]
-- Reverse Nordic (kneeling, 4-count lower to tolerance): 3x8
-- Tibialis raise, back to wall: 3x25
-- Standing calf stretch, knee bent (soleus): 90s left / 60s right
+3a. DB scaption raise: 4x12
+3b. Face pulls with external rotation emphasis: 4x15
 
 CORE / PELVIS  [rest 60s between sets, ~14 min]
 - Side plank with abduction (right side extra to fire underactive
@@ -246,6 +261,14 @@ flexors)  [~18 min, rest 30s between drills]
 - Band-resisted lateral bounds (controlled): 10/side
 - Ankle pogo hops: 20
 
+KNEE / HAMSTRING BLOCK (knee prep - runs BEFORE the supersets)
+[rest 90s between sets, ~15 min]
+- Backward sled drag (moderate, continuous): 3x30m
+- ATG split squat, front foot on low board, left-biased:
+  3x8 left / 2x8 right
+- Nordic hamstring curl, 4-count eccentric (rope-assisted as
+  needed): 4x5
+
 MAIN - SUPERSET A  [rest 120s between rounds, ~16 min]
 1a. Trap bar jump shrug: 5x4
 1b. Single-leg RDL (KB), left-biased: 4x10 left / 3x10 right
@@ -254,16 +277,9 @@ MAIN - SUPERSET B  [rest 90s between rounds, ~14 min]
 2a. Depth drop into stick landing (low board, control-focused): 4x4
 2b. Weighted hip flexor march (band or ankle weight): 4x10/side
 
-KNEE / HAMSTRING BLOCK  [rest 90s between sets, ~15 min]
-- Nordic hamstring curl, 4-count eccentric (rope-assisted as
-  needed): 4x5
-- Backward sled drag (moderate, continuous): 3x30m
-- ATG split squat, front foot on low board, left-biased:
-  3x8 left / 2x8 right
-
 MAIN - SUPERSET C  [rest 120s between rounds, ~16 min]
-3a. Heavy sled march (long forceful stride, no running): 6x20m
-3b. Suitcase carry, left-loaded: 3x30m/side
+3a. Suitcase carry, left-loaded: 3x30m/side
+3b. Heavy sled march (long forceful stride, no running): 6x20m
 
 FINISHER  [~12 min]
 - Pallof press iso hold: 3x60s/side
@@ -285,24 +301,25 @@ flexor length)  [~18 min, rest 30s between drills]
 - Side-lying hip abduction (band), right extra set: 15/side
 - Tibialis raise, back to wall: 3x20
 
-MAIN - SUPERSET A  [rest 120s between rounds, ~16 min]
-1a. Barbell hip thrust: 5x8
-1b. Standing banded hip flexion, left-biased: 4x12 left / 3x12 right
-
-MAIN - SUPERSET B  [rest 90s between rounds, ~16 min]
-2a. Single-leg RDL (DB), left-biased: 4x8 left / 3x8 right
-2b. Copenhagen plank, left extra: 4x60s left / 3x45s right
-
-KNEE / TIBIALIS BLOCK  [rest 60s between sets, ~14 min]
+KNEE / TIBIALIS BLOCK (knee prep - runs BEFORE the supersets)
+[rest 60s between sets, ~14 min]
 - Banded leg curl (ankle wrap), left-biased: 4x15 left / 3x15 right
 - Reverse Nordic (4-count lower): 3x8
 - ATG split squat, front foot on low board, left-biased:
   3x8 left / 2x8 right
 
+MAIN - SUPERSET A  [rest 90s between rounds, ~16 min]
+1a. Single-leg RDL (DB), left-biased: 4x8 left / 3x8 right
+1b. Copenhagen plank, left extra: 4x60s left / 3x45s right
+
+MAIN - SUPERSET B  [rest 120s between rounds, ~16 min]
+2a. Standing banded hip flexion, left-biased: 4x12 left / 3x12 right
+2b. Barbell hip thrust: 5x8
+
 MAIN - SUPERSET C  [rest 75s between rounds, ~13 min]
-3a. Band-resisted monster walks: 4x20 steps
-3b. Right-side single-leg glute bridge (correcting right glute med
+3a. Right-side single-leg glute bridge (correcting right glute med
     underactivity): 4x12
+3b. Band-resisted monster walks: 4x20 steps
 
 FINISHER  [~14 min]
 - Standing banded hip abduction iso hold, right extra:

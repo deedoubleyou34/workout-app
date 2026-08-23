@@ -192,37 +192,59 @@ export function renderDay(root, dayNo) {
     next);
   root.append(pager);
 
-  // ---------- single exercise card ----------
+  // ---------- single exercise: three separate cards ----------
   const b = sec.blocks[st.idx];
-  const card = el('section', 'blockcard blockcard-solo');
-  const head = el('div', 'blockhead');
-  head.append(el('span', 'blockcode', b.block_code));
-  head.append(el('span', 'blockname', b.ex_name));
-  if (b.bias_side) head.append(el('span', 'chip chip-bias', b.bias_side[0].toUpperCase() + ' first'));
-  card.append(head);
+  const stack = el('div', 'cardstack');
 
   const targets = query('SELECT * FROM block_target WHERE block_id = ? ORDER BY id', [b.id]);
   const ordered = b.bias_side
     ? [...targets].sort((a, c) => (a.side === b.bias_side ? -1 : c.side === b.bias_side ? 1 : 0))
     : targets;
 
+  // 1 — the exercise
+  const exCard = el('section', 'blockcard');
+  const head = el('div', 'blockhead');
+  head.append(el('span', 'blockcode', b.block_code));
+  head.append(el('span', 'blockname', b.ex_name));
+  if (b.bias_side) head.append(el('span', 'chip chip-bias', b.bias_side[0].toUpperCase() + ' first'));
+  exCard.append(head);
   const meta = ordered.map((t) => targetText(t, b.is_timed)).join(' · ')
     + (b.rest_seconds_after ? ' · rest ' + b.rest_seconds_after + 's' : '');
-  card.append(el('p', 'targets', meta));
-  card.append(el('p', 'instruction', b.instruction));
-  card.append(el('p', 'feelcue', 'Feel: ' + b.feel_cue));
+  exCard.append(el('p', 'targets', meta));
+  stack.append(exCard);
 
+  // 2 — how-to + feel
+  const howCard = el('section', 'blockcard howcard');
+  howCard.append(el('h3', 'cardlabel', 'How'));
+  howCard.append(el('p', 'instruction', b.instruction));
+  howCard.append(el('p', 'feelcue', 'Feel: ' + b.feel_cue));
+  stack.append(howCard);
+
+  // 3 — set log, one aligned column per set number
+  const logCard = el('section', 'blockcard logcard');
+  logCard.append(el('h3', 'cardlabel', 'Set log'));
+  const maxSets = isNightly ? 1 : Math.max(...ordered.map((t) => t.sets));
+  const grid = el('div', 'setgrid');
+  grid.style.gridTemplateColumns = 'auto repeat(' + maxSets + ', minmax(52px, 1fr))';
+  if (!isNightly && maxSets > 1) {
+    grid.append(el('span', 'gridhead', ''));
+    for (let i = 1; i <= maxSets; i++) grid.append(el('span', 'gridhead', 'set ' + i));
+  }
   for (const t of ordered) {
-    const row = el('div', 'setrow');
-    row.append(el('span', 'sidelabel', t.side === 'both' ? '—' : t.side[0].toUpperCase()));
+    const sideLabel = t.side === 'both' ? '—' : t.side[0].toUpperCase();
+    grid.append(el('span', 'sidelabel', sideLabel + ' · ' + targetText(t, b.is_timed).replace(/^[LR] /, '')));
     if (isNightly) {
       const logged = nightLogs.get(b.ex_name + '|' + t.side);
       const btn = el('button', 'setbtn' + (logged ? ' hit' : ''),
         logged ? logged.value + (logged.unit === 'sec' ? 's' : '') + ' ✓' : 'log');
       btn.onclick = () => openSheet(b, t, 1, logged || null);
-      row.append(btn);
+      grid.append(btn);
     } else {
-      for (let i = 1; i <= t.sets; i++) {
+      for (let i = 1; i <= maxSets; i++) {
+        if (i > t.sets) {
+          grid.append(el('span', 'setpad', ''));
+          continue;
+        }
         const logged = setLogs.get(b.id + '|' + t.side + '|' + i);
         let label = String(i);
         if (logged) {
@@ -232,19 +254,20 @@ export function renderDay(root, dayNo) {
         }
         const btn = el('button', 'setbtn' + (logged ? (logged.hit_target ? ' hit' : ' miss') : ''), label);
         btn.onclick = () => openSheet(b, t, i, logged || null);
-        row.append(btn);
+        grid.append(btn);
       }
     }
-    card.append(row);
   }
+  logCard.append(grid);
+  stack.append(logCard);
 
   // swipe left/right moves between exercises
   let touchX = null, touchY = null;
-  card.addEventListener('touchstart', (e) => {
+  stack.addEventListener('touchstart', (e) => {
     touchX = e.touches[0].clientX;
     touchY = e.touches[0].clientY;
   }, { passive: true });
-  card.addEventListener('touchend', (e) => {
+  stack.addEventListener('touchend', (e) => {
     if (touchX === null) return;
     const dx = e.changedTouches[0].clientX - touchX;
     const dy = e.changedTouches[0].clientY - touchY;
@@ -252,7 +275,7 @@ export function renderDay(root, dayNo) {
     if (Math.abs(dx) > 60 && Math.abs(dy) < 50) go(dx < 0 ? 1 : -1);
   }, { passive: true });
 
-  root.append(card);
+  root.append(stack);
   window.scrollTo(0, 0);
 
   // ---------- bottom-sheet set entry ----------

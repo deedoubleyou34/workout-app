@@ -92,6 +92,16 @@ Do not scaffold future phases "while you're in there." The gates exist because i
 
 Running record of audit findings and decisions made as phases progress. Newest first. Add an entry whenever a phase surfaces something that changes the plan, the spec, or how we work.
 
+### 2026-08-22 — Day reorder + UI restructure (build 008, Dom's direction)
+
+Dom's calls, applied to `workout_plan.txt` (source of truth), the seed, and the UI:
+
+1. **Block order changed on every lifting day**: warm-up → knee/tendon block (moved up as targeted knee prep, KOT-style) → main lifts → finisher. Within supersets, **unilateral before bilateral** (Copenhagen before KB swings, SL RDL pair promoted to Superset A on Day 4, suitcase carry before sled march, etc.). Coach exception kept: **explosive pairs (trap bar jump shrug) stay first among the main lifts** — ballistic work on fatigued tendons violates philosophy #2/#8. The ordering principle is documented in the plan's WEEKLY STRUCTURE section.
+2. **Schema migration v2** remaps `set_log.block_id` across the reorder keyed by (day_no, exercise_id, occurrence) — NOT block_code, which the reorder renamed. `tools/verify_migration.mjs` proves it against the actual v1 seed from git history (90/90 sets survive). This is the pattern for all future seed reorders.
+3. **Day screen split into three cards**: exercise (name/targets/rest), How (instruction + feel cue), Set log (aligned grid — one column per set number, one row per leg, so L/R line up).
+4. **DBZ theme**: Saiyan gold + gi orange + ki blue on deep space; power-level line on the home screen computed from logged volume.
+5. DBeaver export/import gate item **deferred** until Dom is at a PC — explicitly agreed it does not block phase progression.
+
 ### 2026-08-22 — Phase 0 COMPLETE (all exit gates passed on Dom's iPhone)
 
 Gates verified: standalone launch with no Safari chrome; opens in airplane mode; push→phone propagation ~45–60 s automatic (build 005 gate test); constants recorded and matching. Two hard-won lessons now baked into the shell:

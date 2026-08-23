@@ -8,8 +8,53 @@ const IDB_NAME = 'workout-app';
 const IDB_STORE = 'kv';
 const IDB_KEY = 'sqlite-db';
 
-// Forward-only. Each entry: { version, sql }. Version 1 is schema.sql + seed.
-const MIGRATIONS = [];
+// Forward-only. Each entry: { version, run(db) }. Version 1 is schema.sql + seed.
+// Exported so tools/verify_migration.mjs can run them against historical seeds.
+export const MIGRATIONS = [
+  {
+    // v2 (build 008): day blocks reordered — knee block moved before supersets,
+    // unilateral before bilateral inside pairs. Exercise ids are unchanged
+    // (EXERCISES array untouched); block ids AND block codes shift, so
+    // set_log.block_id is remapped by (day_no, exercise_id, occurrence) —
+    // NOT block_code, which the reorder renamed (e.g. Copenhagen 3b→3a).
+    version: 2,
+    run(db) {
+      const readBlocks = () => {
+        const rows = [];
+        const stmt = db.prepare(
+          'SELECT b.id, d.day_no, b.exercise_id FROM block b ' +
+          'JOIN day_template d ON d.id = b.day_template_id ORDER BY b.id');
+        while (stmt.step()) rows.push(stmt.getAsObject());
+        stmt.free();
+        return rows;
+      };
+      const keyed = (rows) => {
+        const seen = new Map();
+        const out = new Map();
+        for (const r of rows) {
+          const base = r.day_no + '|' + r.exercise_id;
+          const n = (seen.get(base) || 0) + 1;
+          seen.set(base, n);
+          out.set(base + '|' + n, r.id);
+        }
+        return out;
+      };
+      const oldMap = keyed(readBlocks());
+      db.run('DELETE FROM block_target; DELETE FROM block; DELETE FROM day_template; DELETE FROM exercise;');
+      seed(db);
+      const newMap = keyed(readBlocks());
+      // negative temp ids first so remaps never collide with real ids
+      const pairs = [];
+      for (const [key, oldId] of oldMap) {
+        const newId = newMap.get(key);
+        if (newId !== undefined && newId !== oldId) pairs.push([oldId, newId]);
+      }
+      pairs.forEach(([oldId], i) => db.run('UPDATE set_log SET block_id=? WHERE block_id=?', [-(i + 1), oldId]));
+      pairs.forEach(([, newId], i) => db.run('UPDATE set_log SET block_id=? WHERE block_id=?', [newId, -(i + 1)]));
+    },
+  },
+];
+const SCHEMA_VERSION = 1 + MIGRATIONS.length;
 
 let SQL = null;
 let db = null;
@@ -73,7 +118,7 @@ export async function initDb() {
     let v = schemaVersion();
     for (const m of MIGRATIONS) {
       if (m.version > v) {
-        db.run(m.sql);
+        m.run(db);
         setSchemaVersion(m.version);
         v = m.version;
       }
@@ -82,7 +127,7 @@ export async function initDb() {
   } else {
     db = await createFresh();
     seed(db);
-    setSchemaVersion(1);
+    setSchemaVersion(SCHEMA_VERSION);
     await persist();
   }
   return db;

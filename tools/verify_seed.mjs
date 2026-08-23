@@ -84,6 +84,16 @@ const rampin = one(
   "OR name LIKE '%knee-to-wall%' OR name LIKE '%short-lever%'").c;
 check('nothing from RAMP-IN / RE-CHECK sections in seed', rampin === 0);
 
+// -- ordering (2026-08-22): knee block before supersets on every lifting day --
+for (const dn of [1, 2, 3, 4]) {
+  const r = one(
+    "SELECT MIN(CASE WHEN b.block_code='knee' THEN b.order_index END) kmin, " +
+    "MIN(CASE WHEN b.superset_group IS NOT NULL THEN b.order_index END) smin " +
+    'FROM block b JOIN day_template d ON d.id=b.day_template_id WHERE d.day_no=?', [dn]);
+  check('Day ' + dn + ': knee block precedes supersets', r.kmin != null && r.kmin < r.smin,
+    'knee@' + r.kmin + ' vs superset@' + r.smin);
+}
+
 // -- rest periods: Day 1 work+rest lands in the 100-115 min window --
 // Time model mirrors the runner semantics in the spec's "Main work" walkthrough:
 // left+right of a unilateral drill run back-to-back inside one ROUND, supersets

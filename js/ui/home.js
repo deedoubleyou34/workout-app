@@ -88,7 +88,14 @@ export function renderHome(root) {
     days: query('SELECT COUNT(*) c FROM day_template')[0].c,
     sets: query('SELECT COUNT(*) c FROM set_log')[0].c,
   };
+  const vol = query(
+    'SELECT COALESCE(SUM(reps_done),0) reps, COALESCE(SUM(hold_seconds_done),0) holds, ' +
+    'COALESCE(SUM(weight_lb*reps_done),0) tonnage FROM set_log')[0];
+  const nightly = query('SELECT COUNT(*) c FROM nightly_log')[0].c;
+  const power = Math.round(counts.sets * 100 + vol.reps * 10 + vol.holds * 5 + vol.tonnage / 10 + nightly * 50);
   const foot = el('footer', 'foot');
+  foot.append(el('p', 'powerline',
+    '⚡ Power level: ' + power.toLocaleString() + (power > 9000 ? " — IT'S OVER 9,000!" : '')));
   foot.append(el('p', 'muted', counts.ex + ' exercises · ' + counts.days + ' templates · ' + counts.sets + ' sets logged'));
   const storageLine = el('p', 'muted', 'storage: checking…');
   foot.append(storageLine);
