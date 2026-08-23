@@ -162,5 +162,39 @@ const allowed = longNight.every(r =>
 check('nightly holds: only left-calf 90s and closing couch 120s exceed 60s', allowed,
   longNight.map(r => r.name + ' ' + r.side + ' ' + r.h + 's').join('; '));
 
+// -- audio: every seeded exercise must have a clip, or the runner goes quiet --
+{
+  let manifest = null;
+  try {
+    manifest = JSON.parse(readFileSync('audio/manifest.json', 'utf8'));
+  } catch {
+    check('audio/manifest.json exists (run tools/gen_audio.py)', false);
+  }
+  if (manifest) {
+    const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').replace(/_+/g, '_');
+    const names = all('SELECT name FROM exercise').map((r) => r.name);
+    const missing = names.filter((n) => !manifest['ex_' + slug(n)]);
+    check('every seeded exercise has a voice clip', missing.length === 0, missing.slice(0, 5).join('; '));
+
+    const structural = ['side_left', 'side_right', 'u_reps', 'u_seconds', 'u_meters',
+      's_rest', 's_main_rest', 's_go', 's_ten_seconds', 's_last_set', 's_session_complete'];
+    const missingPhrases = structural.filter((c) => !manifest[c]);
+    check('structural cue clips present', missingPhrases.length === 0, missingPhrases.join(', '));
+
+    // every hold value the plan actually uses must have a natural spoken clip
+    const holds = all('SELECT DISTINCT hold_seconds h FROM block_target WHERE hold_seconds IS NOT NULL')
+      .map((r) => r.h);
+    const missingHolds = holds.filter((h) => !manifest['sec_' + h] && !(h >= 1 && h <= 50 && manifest['n_' + h]));
+    check('every prescribed hold length is speakable', missingHolds.length === 0, missingHolds.join(', '));
+    check('120 s says "two minutes", not "one hundred twenty seconds"',
+      manifest.sec_120 && /two minutes/i.test(manifest.sec_120.text),
+      manifest.sec_120 && manifest.sec_120.text);
+
+    const durations = Object.values(manifest).map((c) => c.ms);
+    check('no zero-length clips', durations.every((d) => d > 0),
+      String(durations.filter((d) => !d).length) + ' zero-length');
+  }
+}
+
 console.log(failures === 0 ? '\nALL CHECKS PASSED' : '\n' + failures + ' CHECK(S) FAILED');
 process.exit(failures === 0 ? 0 : 1);

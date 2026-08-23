@@ -482,3 +482,6 @@ html, body {
   font-size: 0.8rem;
   text-decoration: none;
 }
+
+.gatecard { padding: 28px 16px; }
+.gatecard .nextname { text-align: center; margin-top: 4px; }

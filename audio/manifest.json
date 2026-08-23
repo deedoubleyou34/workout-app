@@ -1,0 +1,697 @@
+{
+ "ex_90_90_hip_switches": {
+  "file": "ex_90_90_hip_switches.mp3",
+  "ms": 1776,
+  "text": "ninety ninety hip switches"
+ },
+ "ex_ab_roller_from_knees": {
+  "file": "ex_ab_roller_from_knees.mp3",
+  "ms": 1776,
+  "text": "Ab roller"
+ },
+ "ex_ankle_pogo_hops": {
+  "file": "ex_ankle_pogo_hops.mp3",
+  "ms": 1776,
+  "text": "Ankle pogo hops"
+ },
+ "ex_arm_circles_cross_body_swings": {
+  "file": "ex_arm_circles_cross_body_swings.mp3",
+  "ms": 2568,
+  "text": "Arm circles + cross-body swings"
+ },
+ "ex_atg_split_squat_front_foot_on_low_board": {
+  "file": "ex_atg_split_squat_front_foot_on_low_board.mp3",
+  "ms": 1776,
+  "text": "A T G split squat"
+ },
+ "ex_backward_sled_drag": {
+  "file": "ex_backward_sled_drag.mp3",
+  "ms": 1776,
+  "text": "Backward sled drag"
+ },
+ "ex_band_external_rotation_at_90_abduction": {
+  "file": "ex_band_external_rotation_at_90_abduction.mp3",
+  "ms": 3336,
+  "text": "Band external rotation at 90\u00b0 abduction"
+ },
+ "ex_band_pull_aparts": {
+  "file": "ex_band_pull_aparts.mp3",
+  "ms": 1776,
+  "text": "Band pull-aparts"
+ },
+ "ex_band_resisted_lateral_bounds": {
+  "file": "ex_band_resisted_lateral_bounds.mp3",
+  "ms": 1920,
+  "text": "Band-resisted lateral bounds"
+ },
+ "ex_band_resisted_monster_walks": {
+  "file": "ex_band_resisted_monster_walks.mp3",
+  "ms": 1920,
+  "text": "Band-resisted monster walks"
+ },
+ "ex_banded_ankle_dorsiflexion_rocks": {
+  "file": "ex_banded_ankle_dorsiflexion_rocks.mp3",
+  "ms": 2352,
+  "text": "Banded ankle dorsiflexion rocks"
+ },
+ "ex_banded_clamshells": {
+  "file": "ex_banded_clamshells.mp3",
+  "ms": 1776,
+  "text": "Banded clamshells"
+ },
+ "ex_banded_hip_flexor_march": {
+  "file": "ex_banded_hip_flexor_march.mp3",
+  "ms": 1776,
+  "text": "Banded hip flexor march"
+ },
+ "ex_banded_leg_curl_ankle_wrap": {
+  "file": "ex_banded_leg_curl_ankle_wrap.mp3",
+  "ms": 1776,
+  "text": "Banded leg curl"
+ },
+ "ex_barbell_hip_thrust": {
+  "file": "ex_barbell_hip_thrust.mp3",
+  "ms": 1776,
+  "text": "Barbell hip thrust"
+ },
+ "ex_broad_jump_hold_and_stick": {
+  "file": "ex_broad_jump_hold_and_stick.mp3",
+  "ms": 1776,
+  "text": "Broad jump hold-and-stick"
+ },
+ "ex_copenhagen_plank": {
+  "file": "ex_copenhagen_plank.mp3",
+  "ms": 1776,
+  "text": "Copenhagen plank"
+ },
+ "ex_couch_stretch": {
+  "file": "ex_couch_stretch.mp3",
+  "ms": 1776,
+  "text": "Couch stretch"
+ },
+ "ex_db_scaption_raise": {
+  "file": "ex_db_scaption_raise.mp3",
+  "ms": 1776,
+  "text": "dumbbell scaption raise"
+ },
+ "ex_dead_bug": {
+  "file": "ex_dead_bug.mp3",
+  "ms": 1776,
+  "text": "Dead bug"
+ },
+ "ex_depth_drop_into_stick_landing": {
+  "file": "ex_depth_drop_into_stick_landing.mp3",
+  "ms": 1848,
+  "text": "Depth drop into stick landing"
+ },
+ "ex_depth_march_low_board": {
+  "file": "ex_depth_march_low_board.mp3",
+  "ms": 1776,
+  "text": "Depth march"
+ },
+ "ex_doorway_pec_stretch": {
+  "file": "ex_doorway_pec_stretch.mp3",
+  "ms": 1776,
+  "text": "Doorway pec stretch"
+ },
+ "ex_face_pulls_external_rotation_emphasis": {
+  "file": "ex_face_pulls_external_rotation_emphasis.mp3",
+  "ms": 1776,
+  "text": "Face pulls"
+ },
+ "ex_fire_hydrant": {
+  "file": "ex_fire_hydrant.mp3",
+  "ms": 1776,
+  "text": "Fire hydrant"
+ },
+ "ex_glute_bridge_iso_hold": {
+  "file": "ex_glute_bridge_iso_hold.mp3",
+  "ms": 1872,
+  "text": "Glute bridge iso hold"
+ },
+ "ex_half_kneeling_single_arm_band_row": {
+  "file": "ex_half_kneeling_single_arm_band_row.mp3",
+  "ms": 1992,
+  "text": "Half-kneeling single-arm band row"
+ },
+ "ex_heavy_sled_march": {
+  "file": "ex_heavy_sled_march.mp3",
+  "ms": 1776,
+  "text": "Heavy sled march"
+ },
+ "ex_heavy_sled_push": {
+  "file": "ex_heavy_sled_push.mp3",
+  "ms": 1776,
+  "text": "Heavy sled push"
+ },
+ "ex_kb_swings": {
+  "file": "ex_kb_swings.mp3",
+  "ms": 1776,
+  "text": "kettlebell swings"
+ },
+ "ex_landmine_press_single_arm": {
+  "file": "ex_landmine_press_single_arm.mp3",
+  "ms": 1776,
+  "text": "Landmine press"
+ },
+ "ex_lateral_band_walks": {
+  "file": "ex_lateral_band_walks.mp3",
+  "ms": 1776,
+  "text": "Lateral band walks"
+ },
+ "ex_leg_swings_front_back_lateral": {
+  "file": "ex_leg_swings_front_back_lateral.mp3",
+  "ms": 1776,
+  "text": "Leg swings"
+ },
+ "ex_nordic_hamstring_curl": {
+  "file": "ex_nordic_hamstring_curl.mp3",
+  "ms": 1776,
+  "text": "Nordic hamstring curl"
+ },
+ "ex_pallof_press": {
+  "file": "ex_pallof_press.mp3",
+  "ms": 1776,
+  "text": "Pallof press"
+ },
+ "ex_pallof_press_iso_hold": {
+  "file": "ex_pallof_press_iso_hold.mp3",
+  "ms": 1968,
+  "text": "Pallof press iso hold"
+ },
+ "ex_prone_trap_raise": {
+  "file": "ex_prone_trap_raise.mp3",
+  "ms": 1776,
+  "text": "Prone trap raise"
+ },
+ "ex_prone_y_t_w": {
+  "file": "ex_prone_y_t_w.mp3",
+  "ms": 1776,
+  "text": "Prone Y T W"
+ },
+ "ex_reverse_nordic": {
+  "file": "ex_reverse_nordic.mp3",
+  "ms": 1776,
+  "text": "Reverse Nordic"
+ },
+ "ex_serratus_punch_banded": {
+  "file": "ex_serratus_punch_banded.mp3",
+  "ms": 1776,
+  "text": "Serratus punch"
+ },
+ "ex_side_lying_hip_abduction_band": {
+  "file": "ex_side_lying_hip_abduction_band.mp3",
+  "ms": 1776,
+  "text": "Side-lying hip abduction"
+ },
+ "ex_side_plank_hip_dips_ql": {
+  "file": "ex_side_plank_hip_dips_ql.mp3",
+  "ms": 1776,
+  "text": "Side plank hip dips"
+ },
+ "ex_side_plank_hold": {
+  "file": "ex_side_plank_hold.mp3",
+  "ms": 1776,
+  "text": "Side plank hold"
+ },
+ "ex_side_plank_with_abduction": {
+  "file": "ex_side_plank_with_abduction.mp3",
+  "ms": 1776,
+  "text": "Side plank with abduction"
+ },
+ "ex_single_leg_ankle_pogo_hops": {
+  "file": "ex_single_leg_ankle_pogo_hops.mp3",
+  "ms": 2088,
+  "text": "Single-leg ankle pogo hops"
+ },
+ "ex_single_leg_box_step_up": {
+  "file": "ex_single_leg_box_step_up.mp3",
+  "ms": 1776,
+  "text": "Single-leg box step-up"
+ },
+ "ex_single_leg_glute_bridge": {
+  "file": "ex_single_leg_glute_bridge.mp3",
+  "ms": 1776,
+  "text": "Single-leg glute bridge"
+ },
+ "ex_single_leg_rdl_db": {
+  "file": "ex_single_leg_rdl_db.mp3",
+  "ms": 2424,
+  "text": "Single-leg R D L, dumbbell"
+ },
+ "ex_single_leg_rdl_kb": {
+  "file": "ex_single_leg_rdl_kb.mp3",
+  "ms": 2472,
+  "text": "Single-leg R D L, kettlebell"
+ },
+ "ex_slow_calf_raises_off_low_board": {
+  "file": "ex_slow_calf_raises_off_low_board.mp3",
+  "ms": 2040,
+  "text": "Slow calf raises off low board"
+ },
+ "ex_standing_banded_hip_abduction_hold": {
+  "file": "ex_standing_banded_hip_abduction_hold.mp3",
+  "ms": 2328,
+  "text": "Standing banded hip abduction hold"
+ },
+ "ex_standing_banded_hip_flexion": {
+  "file": "ex_standing_banded_hip_flexion.mp3",
+  "ms": 1872,
+  "text": "Standing banded hip flexion"
+ },
+ "ex_standing_calf_raise_iso_hold_top": {
+  "file": "ex_standing_calf_raise_iso_hold_top.mp3",
+  "ms": 2376,
+  "text": "Standing calf raise iso hold"
+ },
+ "ex_standing_calf_stretch_knee_bent_soleus": {
+  "file": "ex_standing_calf_stretch_knee_bent_soleus.mp3",
+  "ms": 3192,
+  "text": "Standing calf stretch, knee bent, soleus"
+ },
+ "ex_standing_calf_stretch_knee_straight": {
+  "file": "ex_standing_calf_stretch_knee_straight.mp3",
+  "ms": 2400,
+  "text": "Standing calf stretch, knee straight"
+ },
+ "ex_suitcase_carry": {
+  "file": "ex_suitcase_carry.mp3",
+  "ms": 1776,
+  "text": "Suitcase carry"
+ },
+ "ex_tibialis_raise_back_to_wall": {
+  "file": "ex_tibialis_raise_back_to_wall.mp3",
+  "ms": 1776,
+  "text": "Tibialis raise"
+ },
+ "ex_tibialis_raise_loaded": {
+  "file": "ex_tibialis_raise_loaded.mp3",
+  "ms": 1800,
+  "text": "Tibialis raise, loaded"
+ },
+ "ex_trap_bar_deadlift_jump_shrug": {
+  "file": "ex_trap_bar_deadlift_jump_shrug.mp3",
+  "ms": 1992,
+  "text": "Trap bar deadlift jump-shrug"
+ },
+ "ex_wall_sit_iso_hold": {
+  "file": "ex_wall_sit_iso_hold.mp3",
+  "ms": 1776,
+  "text": "Wall sit iso hold"
+ },
+ "ex_wall_slides_with_scapular_protraction": {
+  "file": "ex_wall_slides_with_scapular_protraction.mp3",
+  "ms": 2328,
+  "text": "Wall slides with scapular protraction"
+ },
+ "ex_weighted_hanging_knee_raise": {
+  "file": "ex_weighted_hanging_knee_raise.mp3",
+  "ms": 1776,
+  "text": "Weighted hanging knee raise"
+ },
+ "ex_weighted_hip_flexor_march": {
+  "file": "ex_weighted_hip_flexor_march.mp3",
+  "ms": 1776,
+  "text": "Weighted hip flexor march"
+ },
+ "n_1": {
+  "file": "n_1.mp3",
+  "ms": 696,
+  "text": "1"
+ },
+ "n_10": {
+  "file": "n_10.mp3",
+  "ms": 696,
+  "text": "10"
+ },
+ "n_11": {
+  "file": "n_11.mp3",
+  "ms": 1776,
+  "text": "11"
+ },
+ "n_12": {
+  "file": "n_12.mp3",
+  "ms": 1776,
+  "text": "12"
+ },
+ "n_13": {
+  "file": "n_13.mp3",
+  "ms": 1776,
+  "text": "13"
+ },
+ "n_14": {
+  "file": "n_14.mp3",
+  "ms": 1776,
+  "text": "14"
+ },
+ "n_15": {
+  "file": "n_15.mp3",
+  "ms": 1776,
+  "text": "15"
+ },
+ "n_16": {
+  "file": "n_16.mp3",
+  "ms": 1776,
+  "text": "16"
+ },
+ "n_17": {
+  "file": "n_17.mp3",
+  "ms": 1776,
+  "text": "17"
+ },
+ "n_18": {
+  "file": "n_18.mp3",
+  "ms": 1776,
+  "text": "18"
+ },
+ "n_19": {
+  "file": "n_19.mp3",
+  "ms": 1776,
+  "text": "19"
+ },
+ "n_2": {
+  "file": "n_2.mp3",
+  "ms": 648,
+  "text": "2"
+ },
+ "n_20": {
+  "file": "n_20.mp3",
+  "ms": 720,
+  "text": "20"
+ },
+ "n_21": {
+  "file": "n_21.mp3",
+  "ms": 1776,
+  "text": "21"
+ },
+ "n_22": {
+  "file": "n_22.mp3",
+  "ms": 1776,
+  "text": "22"
+ },
+ "n_23": {
+  "file": "n_23.mp3",
+  "ms": 1776,
+  "text": "23"
+ },
+ "n_24": {
+  "file": "n_24.mp3",
+  "ms": 1776,
+  "text": "24"
+ },
+ "n_25": {
+  "file": "n_25.mp3",
+  "ms": 1776,
+  "text": "25"
+ },
+ "n_26": {
+  "file": "n_26.mp3",
+  "ms": 1776,
+  "text": "26"
+ },
+ "n_27": {
+  "file": "n_27.mp3",
+  "ms": 1776,
+  "text": "27"
+ },
+ "n_28": {
+  "file": "n_28.mp3",
+  "ms": 1776,
+  "text": "28"
+ },
+ "n_29": {
+  "file": "n_29.mp3",
+  "ms": 1776,
+  "text": "29"
+ },
+ "n_3": {
+  "file": "n_3.mp3",
+  "ms": 696,
+  "text": "3"
+ },
+ "n_30": {
+  "file": "n_30.mp3",
+  "ms": 720,
+  "text": "30"
+ },
+ "n_31": {
+  "file": "n_31.mp3",
+  "ms": 1776,
+  "text": "31"
+ },
+ "n_32": {
+  "file": "n_32.mp3",
+  "ms": 1776,
+  "text": "32"
+ },
+ "n_33": {
+  "file": "n_33.mp3",
+  "ms": 1776,
+  "text": "33"
+ },
+ "n_34": {
+  "file": "n_34.mp3",
+  "ms": 1776,
+  "text": "34"
+ },
+ "n_35": {
+  "file": "n_35.mp3",
+  "ms": 1776,
+  "text": "35"
+ },
+ "n_36": {
+  "file": "n_36.mp3",
+  "ms": 1776,
+  "text": "36"
+ },
+ "n_37": {
+  "file": "n_37.mp3",
+  "ms": 1776,
+  "text": "37"
+ },
+ "n_38": {
+  "file": "n_38.mp3",
+  "ms": 1776,
+  "text": "38"
+ },
+ "n_39": {
+  "file": "n_39.mp3",
+  "ms": 1776,
+  "text": "39"
+ },
+ "n_4": {
+  "file": "n_4.mp3",
+  "ms": 744,
+  "text": "4"
+ },
+ "n_40": {
+  "file": "n_40.mp3",
+  "ms": 744,
+  "text": "40"
+ },
+ "n_41": {
+  "file": "n_41.mp3",
+  "ms": 1776,
+  "text": "41"
+ },
+ "n_42": {
+  "file": "n_42.mp3",
+  "ms": 1776,
+  "text": "42"
+ },
+ "n_43": {
+  "file": "n_43.mp3",
+  "ms": 1776,
+  "text": "43"
+ },
+ "n_44": {
+  "file": "n_44.mp3",
+  "ms": 1776,
+  "text": "44"
+ },
+ "n_45": {
+  "file": "n_45.mp3",
+  "ms": 1776,
+  "text": "45"
+ },
+ "n_46": {
+  "file": "n_46.mp3",
+  "ms": 1776,
+  "text": "46"
+ },
+ "n_47": {
+  "file": "n_47.mp3",
+  "ms": 1776,
+  "text": "47"
+ },
+ "n_48": {
+  "file": "n_48.mp3",
+  "ms": 1776,
+  "text": "48"
+ },
+ "n_49": {
+  "file": "n_49.mp3",
+  "ms": 1776,
+  "text": "49"
+ },
+ "n_5": {
+  "file": "n_5.mp3",
+  "ms": 1776,
+  "text": "5"
+ },
+ "n_50": {
+  "file": "n_50.mp3",
+  "ms": 1776,
+  "text": "50"
+ },
+ "n_6": {
+  "file": "n_6.mp3",
+  "ms": 1776,
+  "text": "6"
+ },
+ "n_7": {
+  "file": "n_7.mp3",
+  "ms": 744,
+  "text": "7"
+ },
+ "n_8": {
+  "file": "n_8.mp3",
+  "ms": 648,
+  "text": "8"
+ },
+ "n_9": {
+  "file": "n_9.mp3",
+  "ms": 720,
+  "text": "9"
+ },
+ "s_four_count": {
+  "file": "s_four_count.mp3",
+  "ms": 1776,
+  "text": "four count lower"
+ },
+ "s_go": {
+  "file": "s_go.mp3",
+  "ms": 648,
+  "text": "go"
+ },
+ "s_hold": {
+  "file": "s_hold.mp3",
+  "ms": 720,
+  "text": "hold"
+ },
+ "s_last_set": {
+  "file": "s_last_set.mp3",
+  "ms": 1776,
+  "text": "last set"
+ },
+ "s_main_rest": {
+  "file": "s_main_rest.mp3",
+  "ms": 1776,
+  "text": "main rest"
+ },
+ "s_next_up": {
+  "file": "s_next_up.mp3",
+  "ms": 1776,
+  "text": "next up"
+ },
+ "s_nice": {
+  "file": "s_nice.mp3",
+  "ms": 648,
+  "text": "good"
+ },
+ "s_rest": {
+  "file": "s_rest.mp3",
+  "ms": 1776,
+  "text": "rest"
+ },
+ "s_session_complete": {
+  "file": "s_session_complete.mp3",
+  "ms": 1776,
+  "text": "session complete"
+ },
+ "s_ten_seconds": {
+  "file": "s_ten_seconds.mp3",
+  "ms": 1776,
+  "text": "ten seconds"
+ },
+ "sec_105": {
+  "file": "sec_105.mp3",
+  "ms": 1776,
+  "text": "105 seconds"
+ },
+ "sec_120": {
+  "file": "sec_120.mp3",
+  "ms": 1776,
+  "text": "two minutes"
+ },
+ "sec_45": {
+  "file": "sec_45.mp3",
+  "ms": 1776,
+  "text": "45 seconds"
+ },
+ "sec_60": {
+  "file": "sec_60.mp3",
+  "ms": 1776,
+  "text": "one minute"
+ },
+ "sec_75": {
+  "file": "sec_75.mp3",
+  "ms": 1776,
+  "text": "75 seconds"
+ },
+ "sec_90": {
+  "file": "sec_90.mp3",
+  "ms": 1776,
+  "text": "a minute thirty"
+ },
+ "side_both": {
+  "file": "side_both.mp3",
+  "ms": 1776,
+  "text": "both sides"
+ },
+ "side_left": {
+  "file": "side_left.mp3",
+  "ms": 1776,
+  "text": "left side"
+ },
+ "side_right": {
+  "file": "side_right.mp3",
+  "ms": 1776,
+  "text": "right side"
+ },
+ "u_meters": {
+  "file": "u_meters.mp3",
+  "ms": 1776,
+  "text": "meters"
+ },
+ "u_of": {
+  "file": "u_of.mp3",
+  "ms": 648,
+  "text": "of"
+ },
+ "u_pounds": {
+  "file": "u_pounds.mp3",
+  "ms": 1776,
+  "text": "pounds"
+ },
+ "u_reps": {
+  "file": "u_reps.mp3",
+  "ms": 1776,
+  "text": "reps"
+ },
+ "u_seconds": {
+  "file": "u_seconds.mp3",
+  "ms": 1776,
+  "text": "seconds"
+ },
+ "u_set": {
+  "file": "u_set.mp3",
+  "ms": 720,
+  "text": "set"
+ },
+ "u_sets": {
+  "file": "u_sets.mp3",
+  "ms": 1776,
+  "text": "sets"
+ }
+}

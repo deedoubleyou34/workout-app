@@ -3,6 +3,7 @@ import { computeFlags } from '../progression.js';
 import { currentSession, startSession, finishSession, logSet,
          saveRunnerState, loadRunnerState, clearRunnerState } from '../sessions.js';
 import { buildSteps, stepTarget, remainingSeconds, resumeIndex, progressOf } from '../runner.js';
+import * as audio from '../audio.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -86,6 +87,7 @@ export function renderRun(root, dayNo) {
   }
   let restStartedAt = saved && saved.restStartedAt ? saved.restStartedAt : null;
   let ticker = null;
+  let warnedAt = null;   // which rest already got its ten-second warning
 
   function save() {
     saveRunnerState(db, { session_id: session.id, index, restStartedAt });
@@ -97,11 +99,88 @@ export function renderRun(root, dayNo) {
     restStartedAt = steps[index] && steps[index].kind === 'rest' ? Date.now() : null;
     save();
     draw();
+    cueFor(steps[index]);
+  }
+
+  // ---------- voice cues ----------
+  function cueFor(step) {
+    if (!step || !audio.isUnlocked()) return;
+    if (step.kind === 'set') {
+      const tgt = stepTarget(step, loadFor(step));
+      audio.play(audio.announceSet({
+        name: step.label, side: step.side,
+        targetKind: tgt.kind, targetValue: tgt.value,
+        setIndex: step.setIndex, totalSets: step.totalSets,
+      }));
+    } else if (step.kind === 'rest') {
+      audio.play(audio.announceRest(step.seconds, { main: step.main }));
+    } else if (step.kind === 'summary') {
+      audio.play(audio.CUE_COMPLETE);
+    }
+  }
+
+  // decode the clips this session will actually use, so the first cue is on time
+  function preloadCues() {
+    const ids = new Set(['s_rest', 's_main_rest', 's_go', 's_ten_seconds',
+      's_last_set', 's_session_complete', 'side_left', 'side_right', 'u_reps', 'u_seconds', 'u_meters']);
+    for (const s of steps) {
+      if (s.kind !== 'set') continue;
+      ids.add(audio.exerciseClip(s.label));
+      const tgt = stepTarget(s, loadFor(s));
+      if (Number.isInteger(tgt.value) && tgt.value >= 1 && tgt.value <= 50) ids.add('n_' + tgt.value);
+      if ([45, 60, 75, 90, 105, 120].includes(tgt.value)) ids.add('sec_' + tgt.value);
+    }
+    audio.preload([...ids]);
+  }
+
+  // ---------- start gate ----------
+  // iOS keeps audio muted until a tap has produced sound, so the session starts
+  // behind one deliberate tap: it unlocks the AudioContext, takes the wake lock,
+  // and only then begins. Also the natural place to resume a killed session.
+  let started = false;
+
+  function drawGate() {
+    root.innerHTML = '';
+    root.className = 'page runpage';
+    const resuming = logged.size > 0;
+    const card = el('section', 'runcard gatecard');
+    card.append(el('div', 'runside', resuming ? 'RESUME' : 'READY'));
+    card.append(el('h1', 'runex', 'Day ' + dayNo));
+    card.append(el('p', 'nextname', day.name));
+    const { done, total } = progressOf(steps, index);
+    card.append(el('p', 'runset', resuming
+      ? done + ' of ' + total + ' sets already logged'
+      : total + ' sets · ' + steps.filter((s) => s.kind === 'rest').length + ' rests'));
+    root.append(card);
+
+    const begin = el('button', 'btn btn-primary donebtn', resuming ? '▶  Resume' : '▶  Start');
+    begin.onclick = async () => {
+      started = true;
+      await audio.unlock();
+      preloadCues();
+      await acquireWakeLock(() => {});
+      draw();
+      cueFor(steps[index]);
+    };
+    root.append(begin);
+
+    const silent = el('button', 'btn', 'Start without voice');
+    silent.onclick = async () => {
+      started = true;
+      await acquireWakeLock(() => {});
+      draw();
+    };
+    root.append(silent);
+
+    const back = el('button', 'btn btn-small', '‹ back to the day');
+    back.onclick = () => { location.hash = '#/day/' + dayNo; };
+    root.append(back);
   }
 
   // ---------- drawing ----------
   function draw() {
     if (ticker) { clearInterval(ticker); ticker = null; }
+    if (!started) return drawGate();
     root.innerHTML = '';
     root.className = 'page runpage';
 
@@ -112,14 +191,15 @@ export function renderRun(root, dayNo) {
     const quit = el('button', 'iconbtn', '✕');
     quit.title = 'Leave the runner (session stays open)';
     quit.onclick = () => {
+      audio.stop();
       releaseWakeLock();
       location.hash = '#/day/' + dayNo;
     };
     bar.append(quit);
     bar.append(el('span', 'runprogress', 'Day ' + dayNo + ' · ' + done + '/' + total + ' sets'));
-    const lockDot = el('span', 'lockdot' + (wakeLockLost ? ' lost' : ''),
-      wakeLockLost ? 'screen may sleep' : 'screen held');
-    bar.append(lockDot);
+    const status = el('span', 'lockdot' + (wakeLockLost ? ' lost' : ''),
+      (audio.isUnlocked() ? '🔊' : '🔇') + ' ' + (wakeLockLost ? 'screen may sleep' : 'screen held'));
+    bar.append(status);
     root.append(bar);
 
     const track = el('div', 'runtrack');
@@ -239,8 +319,14 @@ export function renderRun(root, dayNo) {
       const left = remainingSeconds(restStartedAt, step.seconds);
       clock.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
       clock.classList.toggle('done', left === 0);
+      // keyed to this rest, so coming back to the app late does not replay it
+      if (left <= 10 && left > 0 && warnedAt !== restStartedAt && step.seconds > 12) {
+        warnedAt = restStartedAt;
+        audio.play(audio.CUE_TEN_SECONDS);
+      }
       if (left === 0) {
         skip.textContent = 'Go ›';
+        audio.play(audio.CUE_GO);
         if (navigator.vibrate) navigator.vibrate(200);
         clearInterval(ticker);
         ticker = null;
@@ -305,7 +391,8 @@ export function renderRun(root, dayNo) {
     const dot = document.querySelector('.lockdot');
     if (dot) {
       dot.className = 'lockdot' + (wakeLockLost ? ' lost' : '');
-      dot.textContent = wakeLockLost ? 'screen may sleep' : 'screen held';
+      dot.textContent = (audio.isUnlocked() ? '🔊' : '🔇') + ' '
+        + (wakeLockLost ? 'screen may sleep' : 'screen held');
     }
   });
   const onVisible = () => {
