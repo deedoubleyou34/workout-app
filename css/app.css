@@ -130,6 +130,45 @@ html, body {
 .foot { margin-top: 26px; }
 .foot p { margin-top: 4px; }
 
+.titlerow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.titlerow .btn-small { margin-top: 0; }
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 0 10px;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 6px 14px;
+  background: var(--card);
+  color: var(--muted);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.tab.active { color: var(--fg); border-color: var(--accent); background: #16233a; }
+.tab.done { color: var(--hit); }
+.tab.done.active { border-color: var(--hit); }
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.pagerbtn { min-width: 56px; font-size: 1.3rem; }
+.pagerbtn:disabled { opacity: 0.3; }
+.pagerlabel { flex: 1; text-align: center; color: var(--muted); font-size: 0.9rem; }
+
+.blockcard-solo { min-height: 45vh; }
+
 .sheet {
   position: fixed;
   left: 0; right: 0; bottom: 0;
