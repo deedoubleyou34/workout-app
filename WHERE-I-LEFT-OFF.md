@@ -1,6 +1,10 @@
 # Where I left off — Hyperbolic Time Chamber
 
-**Last updated:** 2026-08-23 · **Live build:** 011 · **Status:** Phases 0–1 done, Phase 2 built and fixed, Phase 3 (session runner) built and deployed. Everything outstanding needs Dom's hands on the phone — nothing is blocked on more code.
+**Last updated:** 2026-08-23 · **Live build:** 013 · **Status:** Phases 0–1 done. Phases 2 (progression), 3 (runner) and 4 (voice cues) built and deployed. Everything outstanding needs Dom's hands on the phone — nothing is blocked on more code.
+
+## ❓ One question I could not answer
+
+Your last message ended mid-sentence: **"Suggestions should be"**. I didn't guess. Tell me how you want suggestions to behave and I'll change it. Right now they are grouped per exercise on the home screen with left/right on separate lines, each with ✓ / ✕ / snooze, plus an **Accept all**.
 
 ---
 
@@ -31,12 +35,19 @@ The parent folder holds reference copies of `workout_plan.txt`, `PROJECT_SPEC.md
 - [ ] Read the suggestion wording and tell me if it reads like plain English.
 
 ### Phase 3 gate (session runner) — needs one real Day 4
-- [ ] Run a full Day 4 start to finish with the runner (home → **▶ Run Day 4**).
+- [ ] Run a full Day 4 start to finish with the runner (home → **▶ Run Day 4**, then **Start**).
 - [ ] Rest timer accurate within ±3 s over the whole session — start a stopwatch at session start, compare at the end.
-- [ ] Screen never sleeps during the session; note the battery % used over ~110 min.
+- [ ] Screen never sleeps during the session; note the battery % used over ~95 min.
 - [ ] Force-quit mid-session, reopen → resumes at the exact set with earlier sets intact.
 - [ ] Every unilateral block leads with the correct side (left for the hip-flexor/ankle work, right for glute-med work).
 - [ ] No set required typing beyond confirming the prefilled numbers.
+
+### Phase 4 gate (voice cues) — can ride along with the Day 1 run
+- [ ] Full session with voice only, phone in your pocket between sets, no missed cues.
+- [ ] **Airplane mode → cues still play.** Give the app a minute on wifi first so the service worker can pull all 139 clips (~1.7 MB), then switch off and run a few steps.
+- [ ] Long holds sound right: 120 s should say *"two minutes"*, 90 s *"a minute thirty"* — not "one hundred twenty seconds".
+- [ ] The ten-second rest warning lands within about a second of true.
+- [ ] Any exercise name that sounds wrong or clumsy — tell me the name and I'll re-record just that clip.
 
 ### Deferred from Phase 1 (needs a PC, agreed not to block)
 - [ ] Export `.sqlite` from the home screen → open in DBeaver → confirm `set_log` holds your sets → Import the same file back into the app.
@@ -86,9 +97,23 @@ Also fixed here: an app update no longer reloads mid-session — the reload wait
 
 ---
 
-## Next up — Phase 4 (not started)
+## Phase 4 — voice cues (built; gate not yet run)
 
-Audio cues. `tools/gen_audio.py` renders MP3 clips with `edge-tts` on the PC (build time only, committed to the repo), the runner concatenates and plays them, iOS audio is unlocked by the session-start tap. Still no Spotify. Instructions and feel cues are **never spoken** — they stay on-screen text.
+139 clips rendered with `edge-tts` (voice `en-US-AndrewNeural`) and committed. The runner announces the exercise with its side and target, announces rest (naming the main rest and what's next), warns at ten seconds, says "go", and calls the session complete. Instructions and feel cues are **never spoken** — they stay on-screen text, as specified.
+
+The runner now opens behind a **Start** tap: iOS keeps audio muted until a tap has produced sound, so that tap unlocks audio, preloads the session's clips and takes the wake lock. There's a "Start without voice" option.
+
+Regenerating audio after changing exercises is one command:
+```
+cd Projects/Workout/workout-app
+pip install -r tools/requirements.txt     # once
+python tools/gen_audio.py                 # only renders what's missing
+python tools/gen_audio.py --force         # re-record everything
+```
+
+## Next up — Phase 5 (not started)
+
+Spotify auth and playback control: Authorization Code with PKCE (no secret), token refresh on a timer sized for a two-hour session, and player control only. The deprecated endpoints (audio-features, audio-analysis, recommendations, related-artists, featured-playlists, category playlists, 30-second previews) must never be called — they 403 for any app registered after 2024-11-27.
 
 ## Deploy loop
 

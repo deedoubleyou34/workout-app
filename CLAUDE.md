@@ -92,6 +92,24 @@ Do not scaffold future phases "while you're in there." The gates exist because i
 
 Running record of audit findings and decisions made as phases progress. Newest first. Add an entry whenever a phase surfaces something that changes the plan, the spec, or how we work.
 
+### 2026-08-23 — Phase 4 built: voice cues (build 013)
+
+- **139 clips, rendered by `tools/gen_audio.py`, committed to the repo.** Exercise names are read straight out of `seed.js` by regex — no JS execution — so adding an exercise and re-running the script is the whole workflow. Incremental by default; `--force` re-renders.
+- **Spoken names drop the parenthetical equipment note, unless that would create a collision.** "Standing calf stretch (knee straight)" and "(knee bent, soleus)" would both become "Standing calf stretch", so those keep the qualifier. The dedupe is automatic, not a hand-maintained exception list.
+- **Clip durations need a full MPEG frame walk.** Reading one frame header and dividing produced 0 ms and other nonsense, because edge-tts output is not reliably constant-bitrate. Even so, the runtime schedules on the **decoded AudioBuffer length**, not the manifest — the manifest's ms figures are advisory and used by tests.
+- **iOS audio unlock is a real gate, so the runner has a start screen.** One deliberate Start tap unlocks the AudioContext, preloads that session's clips and takes the wake lock. A hash-link click was not reliable to unlock from. There is a "Start without voice" path.
+- **The ten-second warning is keyed to the specific rest** (`warnedAt === restStartedAt`), otherwise returning to the app late in a rest replays it.
+- **The service worker precaches audio by reading `audio/manifest.json`**, in chunks of 12 — a single `addAll` of ~140 requests upsets iOS Safari, and hardcoding the list in `sw.js` would rot the moment clips are regenerated.
+- `verify_seed.mjs` now fails if any seeded exercise lacks a clip, if a prescribed hold length is unspeakable, or if 120 s is not phrased "two minutes".
+
+### 2026-08-23 — Build 012: shorter rests and a main rest per category (Dom's direction)
+
+Rest cut across the board (30→20, 60→45, 75→60, 90→60, 120→90, 150→120) and the **main rest moved to category boundaries**: the runner no longer rests after a category's final round and then again at the change — the category's trailing rest *becomes* the main rest, labelled and naming what is next. Sessions now run 88–106 min (was 96–118); plan durations updated to match.
+
+Also: band inputs are numeric (no text fields left in set entry), and **a finished day resets** — the grid only fills from an `in_progress` session, so reopening a completed day is a clean slate carrying accepted progressions, with a "last completed" line for context.
+
+Migration note: `reseedAndRemap()` is now shared by v2 and v4, and **MIGRATIONS must stay in ascending version order** — they are applied in array order and each bumps the stored version, so an out-of-order entry makes every lower version unreachable. I hit this inserting v4 above v3.
+
 ### 2026-08-23 — Phase 3 built: silent session runner (build 011)
 
 - **`buildSteps()` in `js/runner.js` is pure** — blocks + targets in, ordered step list out. Ordering rules (bias side first, superset alternation, asymmetric set counts, rest placement) are unit-tested with no DOM and no clock. Any future ordering change goes there, not into the UI.
