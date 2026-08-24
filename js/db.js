@@ -105,7 +105,11 @@ function idbOpen() {
   });
 }
 
-async function idbGet(key) {
+// Exported for js/spotify.js: OAuth tokens live in IndexedDB alongside the
+// database blob, NOT in the sqlite file — a .sqlite export is something Dom
+// opens in an editor and could hand around, and it has no business carrying
+// credentials.
+export async function idbGet(key) {
   const d = await idbOpen();
   return new Promise((resolve, reject) => {
     const req = d.transaction(IDB_STORE).objectStore(IDB_STORE).get(key);
@@ -114,7 +118,7 @@ async function idbGet(key) {
   });
 }
 
-async function idbPut(key, value) {
+export async function idbPut(key, value) {
   const d = await idbOpen();
   return new Promise((resolve, reject) => {
     const tx = d.transaction(IDB_STORE, 'readwrite');

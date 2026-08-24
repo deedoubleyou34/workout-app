@@ -512,3 +512,51 @@ html, body {
   letter-spacing: 0.03em;
   margin-top: 2px;
 }
+
+/* ---- Spotify panel (build 015, Phase 5) ---- */
+.musicsec { margin-top: 22px; }
+.music h2 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.nowplaying {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--fg);
+  margin: 6px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.musicrow { display: flex; gap: 8px; margin: 8px 0; }
+.musicbtn {
+  flex: 1;
+  min-height: 48px;
+  font-size: 1.25rem;
+  padding: 0;
+}
+.musicnote { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+.musicnote.bad { color: var(--miss); }
+.musicdevices { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+
+/* the runner's rest-screen strip: smaller, out of the way of the clock */
+.runmusic { margin-top: 14px; }
+.music-compact .nowplaying { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+.music-compact .musicbtn { min-height: 40px; font-size: 1rem; }
+.music-compact .musicnote { font-size: 0.72rem; }
+
+/* one-shot banner for the OAuth round trip */
+.notice {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0b1020;
+  background: var(--gold);
+}
+.notice.bad { background: var(--miss); color: #fff; }

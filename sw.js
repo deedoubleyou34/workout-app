@@ -1,5 +1,5 @@
 // Cache-first app shell. Bump CACHE on every deploy that changes shell files.
-const CACHE = 'shell-v14';
+const CACHE = 'shell-v15';
 
 const SHELL = [
   './',
@@ -7,6 +7,8 @@ const SHELL = [
   './css/app.css',
   './js/main.js',
   './js/audio.js',
+  './js/spotify.js',
+  './js/ui/music.js',
   './js/cues.js',
   './audio/manifest.json',
   './js/db.js',
@@ -69,6 +71,10 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  // Same-origin only. Without this, every GET to api.spotify.com would be
+  // cached and then SERVED FROM CACHE — the app would show whatever track was
+  // playing the first time it asked, forever.
+  if (new URL(e.request.url).origin !== self.location.origin) return;
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true }).then(
       (hit) => hit || fetch(e.request).then((res) => {

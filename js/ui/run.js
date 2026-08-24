@@ -4,6 +4,7 @@ import { currentSession, startSession, finishSession, logSet,
          saveRunnerState, loadRunnerState, clearRunnerState } from '../sessions.js';
 import { buildSteps, stepTarget, remainingSeconds, resumeIndex, progressOf } from '../runner.js';
 import * as audio from '../audio.js';
+import { renderMusic } from './music.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -394,6 +395,12 @@ export function renderRun(root, dayNo) {
     const skip = el('button', 'btn btn-primary donebtn', 'Skip rest');
     skip.onclick = () => go(index + 1);
     root.append(skip);
+
+    // Rest is the only sane moment to touch the music, so the controls appear
+    // here and nowhere else in the runner.
+    const musicBar = el('div', 'runmusic');
+    root.append(musicBar);
+    renderMusic(musicBar, { compact: true });
 
     // wall-clock delta, recomputed every tick — survives iOS throttling
     const paint = () => {

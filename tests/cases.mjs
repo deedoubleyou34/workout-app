@@ -12,6 +12,8 @@ import { nextDayUp, startOver, currentSession, finishSession } from '../js/sessi
 import { buildSteps, remainingSeconds, resumeIndex, progressOf, stepTarget, isTimedStep,
          MAIN_REST_FLOOR } from '../js/runner.js';
 import { setText, restText, cueId, spokenSeconds, hasSecondsClip } from '../js/cues.js';
+import { needsRefresh, callbackParams, retryAfterMs, describeError,
+         nowPlayingText } from '../js/spotify.js';
 
 const EX = {
   slRdl:      { id: 1, name: 'Single-leg RDL (DB)', category: 'strength',   load_type: 'dumbbell',   is_timed: 0, increment_value: 5,  increment_unit: 'lb' },
@@ -472,6 +474,53 @@ export async function run(ctx) {
       cueId('Reverse Nordic. 15 reps.') === 'c_reverse_nordic_15_reps');
     check('an accepted hold progression (60 -> 70 s) is still speakable', hasSecondsClip(70));
     check('an off-grid value is not claimed to be speakable', !hasSecondsClip(63));
+  }
+
+  // 30. Spotify: the token arithmetic and the failure vocabulary (Phase 5).
+  //     A token lasts an hour and a session runs two, so "does this need
+  //     replacing yet" is the question the whole flow turns on.
+  {
+    const now = 1_000_000_000;
+    const min = 60 * 1000;
+    check('a token with 30 minutes left is left alone', !needsRefresh(now + 30 * min, now));
+    check('a token with 5 minutes left is replaced before it dies', needsRefresh(now + 5 * min, now));
+    check('a token already dead needs replacing', needsRefresh(now - min, now));
+    check('no expiry recorded means refresh', needsRefresh(null, now));
+  }
+
+  // 31. the OAuth redirect is parsed without touching the network
+  {
+    eq('a successful callback yields code and state',
+      callbackParams('?code=abc123&state=xyz'), { code: 'abc123', error: null, state: 'xyz' });
+    eq('a refused callback yields the error',
+      callbackParams('?error=access_denied&state=xyz'),
+      { code: null, error: 'access_denied', state: 'xyz' });
+    check('an ordinary launch is not mistaken for a callback', callbackParams('') === null);
+    check('a cache-buster query is not mistaken for a callback', callbackParams('?cb=12345') === null);
+  }
+
+  // 32. every failure the spec names gets a readable line, not a hang
+  {
+    eq('401 reads as an expired login', describeError(401)[0], 'expired');
+    eq('403 PREMIUM_REQUIRED says so plainly', describeError(403, 'PREMIUM_REQUIRED')[0], 'premium');
+    eq('404 / NO_ACTIVE_DEVICE tells him to start Spotify first',
+      describeError(404, 'NO_ACTIVE_DEVICE')[0], 'no_device');
+    eq('429 is named as rate limiting', describeError(429)[0], 'rate_limited');
+    check('the no-device message says what to do',
+      /start something playing in spotify/i.test(describeError(404, 'NO_ACTIVE_DEVICE')[1]),
+      describeError(404, 'NO_ACTIVE_DEVICE')[1]);
+    const headers = { get: (k) => (k === 'Retry-After' ? '3' : null) };
+    eq('Retry-After is respected, in seconds', retryAfterMs(headers), 3000);
+    eq('a missing Retry-After still backs off', retryAfterMs({ get: () => null }), 1000);
+  }
+
+  // 33. now-playing text
+  {
+    eq('track and artists read as one line',
+      nowPlayingText({ item: { name: 'Sabotage', artists: [{ name: 'Beastie Boys' }] } }),
+      'Sabotage — Beastie Boys');
+    check('nothing playing is null, not a crash', nowPlayingText(null) === null);
+    check('a state with no item is null', nowPlayingText({ is_playing: false }) === null);
   }
 
   // 25. rest countdown is wall-clock, so a throttled/backgrounded app catches up

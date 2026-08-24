@@ -1,4 +1,5 @@
 import { initDb } from './db.js';
+import { handleRedirect, watchForeground } from './spotify.js';
 import { renderHome } from './ui/home.js';
 import { renderDay } from './ui/day.js';
 import { renderRun } from './ui/run.js';
@@ -13,8 +14,30 @@ function route() {
   return renderHome(app);
 }
 
+// A banner for whatever the Spotify redirect had to say, cleared on the next
+// navigation. Nothing here blocks the app: a failed login must not stop Dom
+// from training.
+function notice(text, bad) {
+  const p = document.createElement('p');
+  p.className = 'notice' + (bad ? ' bad' : '');
+  p.textContent = text;
+  document.body.insertBefore(p, document.body.firstChild);
+  setTimeout(() => p.remove(), 8000);
+}
+
 (async () => {
   try {
+    // before routing: the OAuth callback lands on ?code=... and the query has
+    // to be consumed and cleaned off the URL first
+    try {
+      const status = await handleRedirect();
+      if (status === 'connected') notice('Spotify connected.');
+      else if (status === 'denied') notice('Spotify login was cancelled.', true);
+      else if (status === 'stale') notice('That Spotify login did not match this app — try again.', true);
+    } catch (err) {
+      notice(err.message || 'Spotify login failed.', true);
+    }
+    watchForeground();
     await initDb();
     window.addEventListener('hashchange', route);
     route();

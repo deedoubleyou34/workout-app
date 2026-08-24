@@ -92,6 +92,23 @@ Do not scaffold future phases "while you're in there." The gates exist because i
 
 Running record of audit findings and decisions made as phases progress. Newest first. Add an entry whenever a phase surfaces something that changes the plan, the spec, or how we work.
 
+### 2026-08-24 — Phase 5 built: Spotify auth and playback control (build 015)
+
+`js/spotify.js` (auth + player), `js/ui/music.js` (the panel, full on home and compact on the runner's rest screens). Authorization Code with **PKCE**, no client secret — a static site cannot hold one.
+
+- **Refresh is proactive, on a timer.** An access token lasts an hour; a session runs two. The token expires mid-session *every session*, so a timer fires at `expires_at − 10 min` (capped at 50 min, because a longer iOS timer is not trustworthy), plus a `visibilitychange` check for a phone that slept through it. The 401-then-retry path is kept as a backstop, not the plan.
+- **Refresh tokens rotate.** A refresh response that carries a new `refresh_token` replaces the stored one; ignoring it breaks the *next* refresh, an hour later, which is a miserable thing to debug. `storeGrant` keeps whichever is newest.
+- **Tokens live in IndexedDB, not the sqlite file.** `db.js` now exports `idbGet`/`idbPut` for this. The `.sqlite` export is something Dom opens in an editor and could hand around; it has no business carrying credentials.
+- **A service-worker bug found while building this.** The fetch handler cached *every* GET, including cross-origin ones, and served them cache-first. Left alone, `GET api.spotify.com/v1/me/player` would have been answered from cache forever — the app would have shown whatever track was playing the first time it asked. The handler is now same-origin only. This would have looked like a Spotify bug and cost hours.
+- **Login navigates in the same window** (`location.assign`), not `window.open`. From an installed PWA, `window.open` hands the flow to a stray Safari tab and the redirect never comes back to the app — the risk-register item for this phase.
+- **The OAuth callback is consumed before routing.** It lands on `?code=…`; `main.js` exchanges it, cleans the URL with `replaceState`, and shows a banner. A failed login never blocks training.
+- **Every failure mode the spec names has a line of text**: expired, Premium required, no active device ("start something playing in Spotify, then come back"), 429 with `Retry-After` respected, 5xx, and no network. Mid-session, an offline error is deliberately quiet — the app is built to work without a network and a red banner every 15 seconds would be a lie about severity.
+- Deprecated endpoints are not called anywhere: audio-features, audio-analysis, recommendations, related-artists, featured-playlists, category playlists, 30-second previews.
+
+Test suite at **89 cases**: token arithmetic, callback parsing, `Retry-After`, the failure vocabulary, and now-playing formatting — all pure, no network in the test run.
+
+Not built here, deliberately: ducking is Phase 6 and the spec is emphatic that it is the riskiest phase and needs a probe before a feature.
+
 ### 2026-08-24 — Dom's gate notes worked through (build 014)
 
 Dom ran Phases 2–4 on the phone and wrote his findings into `WHERE-I-LEFT-OFF.md`. Everything he raised is in this build.

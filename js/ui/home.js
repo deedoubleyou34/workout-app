@@ -1,6 +1,7 @@
 import { query, storageStatus, exportSqliteBlob, exportJsonBlob, exportCsvBlob, importBytes, getDb, persist } from '../db.js';
 import { pendingFlags, acceptFlag, acceptAll, declineFlag, snoozeFlag, isSessionHit } from '../progression.js';
 import { daySummaries, nextDayUp, lastSessionReport, nightlyStreak, today, weekStart } from '../sessions.js';
+import { renderMusic } from './music.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -189,6 +190,11 @@ export function renderHome(root) {
     list.append(a);
   }
   root.append(list);
+
+  // ---------- music ----------
+  const music = el('section', 'musicsec');
+  root.append(music);
+  renderMusic(music);
 
   // ---------- data ----------
   const data = el('section', 'datasec');

@@ -1,6 +1,6 @@
 # Where I left off — Hyperbolic Time Chamber
 
-**Last updated:** 2026-08-24 · **Live build:** 014 · **Status:** Phases 0–4 built and deployed. Every note you left in this file has been worked through and shipped. Phase 5 (Spotify) is next.
+**Last updated:** 2026-08-24 · **Live build:** 015 · **Status:** Phases 0–5 built and deployed. Every note you left in this file has been worked through and shipped, and Spotify is now wired up.
 
 ---
 
@@ -23,9 +23,9 @@
 
 Every input in the app is already a number field; there is **no text box anywhere in set entry**, and hasn't been since build 013. So what you saw was almost certainly build 012 still running on the phone.
 
-To make that answerable rather than guessable, the **build number now shows on the day screen and in the runner's top bar** (`b014`), and the field is labelled **Band (lb)**.
+To make that answerable rather than guessable, the **build number now shows on the day screen and in the runner's top bar** (`b015`), and the field is labelled **Band (lb)**.
 
-Next time it happens: tell me **the exercise name and the build number on screen**. If it says b014 and still shows a QWERTY keyboard, that's a real iOS bug and I'll work around it.
+Next time it happens: tell me **the exercise name and the build number on screen**. If it says b015 and still shows a QWERTY keyboard, that's a real iOS bug and I'll work around it.
 
 (One genuine bug did turn up next door: if a band value had ever been saved as a word rather than a number, the field came back blank instead of prefilled. Fixed.)
 
@@ -74,10 +74,10 @@ Only the `.sqlite` file can be imported back. The CSV is one-way.
 
 ### Your two unfinished items
 
-- [ ] **Run the tests in Safari on the phone.** Home screen → *Run progression tests →* at the bottom. Expect **ALL 71 TESTS PASSED** (the old note said 53 — that number was stale, not a failure). Screenshot anything that fails.
+- [ ] **Run the tests in Safari on the phone.** Home screen → *Run progression tests →* at the bottom. Expect **ALL 89 TESTS PASSED** (your note said 53 — that number was stale, not a failure; the suite has grown). Screenshot anything that fails.
 - [ ] **Rest-timer accuracy, ±3 s over a whole session.** Start a stopwatch when the session starts, compare at the end. This one needs re-running regardless: the rest values changed in this build, so any earlier measurement is void.
 
-### New in build 014 — worth a look on your next session
+### New in builds 014/015 — worth a look on your next session
 
 - [ ] A stretch or hold **starts counting on its own**. Does the auto-start land right, or do you want a longer set-up beat before it runs?
 - [ ] Voice: is it **one flowing sentence** now, and is +18% the right speed? Too fast is as bad as too slow — tell me either way.
@@ -85,6 +85,21 @@ Only the `.sqlite` file can be imported back. The CSV is one-way.
 - [ ] Warm-up runs with **5 s between drills**. Too tight? Too loose?
 - [ ] Home screen: does the **weekly power level** read the way you meant it?
 - [ ] Any exercise name that still sounds wrong or clumsy — give me the name and I'll re-record just that clip.
+
+### New in build 015 — Spotify (this is the Phase 5 gate)
+
+Home screen → **Music** → **Connect Spotify**. Playback control needs **Premium** — Spotify's rule, not the app's.
+
+- [ ] Log in on the iPhone → you land back **inside the installed app**, not in a stray Safari tab, and the banner says *Spotify connected*.
+- [ ] Play / pause / skip / previous all work against Spotify on the phone.
+- [ ] **Devices…** lists your devices; tapping one moves playback to it.
+- [ ] With nothing playing, a control press says *"No active device. Start something playing in Spotify, then come back."* — not a silent failure.
+- [ ] Turn the phone's data off and press a control: you get a readable line, and the runner shows a quiet *Music offline* rather than an alarm.
+- [ ] **Close the app for 2+ hours, reopen** → still logged in, no re-login prompt. (This is the refresh-token path.)
+- [ ] **Leave the app open and idle for 65+ minutes, then press play** → it works, with no error and no re-login. This is the mid-session token expiry, and it will happen in every single session.
+- [ ] During a session, the rest screens carry a small track line with ⏮ ⏯ ⏭. Right amount of music control mid-workout, or do you want it somewhere else too?
+
+**If login fails immediately**, the first thing to check is the redirect URI in the Spotify dashboard (developer.spotify.com → your app → Settings). It must be **exactly** `https://deedoubleyou34.github.io/workout-app/` — including the trailing slash. Spotify compares it as a string.
 
 **Airplane-mode note:** the clip library grew from 1.7 MB to 4.4 MB. Give the app a couple of minutes on wifi after this update before you rely on offline cues.
 
@@ -127,13 +142,17 @@ python tools/gen_audio.py --force --prune # re-record everything, drop the stale
 
 ---
 
-## Next up — Phase 5 (Spotify)
+### Phase 5 — Spotify (built in build 015)
 
-Authorization Code with **PKCE** (no client secret, since the app is public), token refresh on a timer sized for a two-hour session, and **playback control only** — the app never becomes a music player. Requires a Premium account for playback control; that is Spotify's rule, not a design choice.
+PKCE login (no client secret — a static site cannot keep one), tokens stored in IndexedDB rather than in the `.sqlite` export, and **playback control only**: the app never becomes a music player. The token refreshes on a timer at the 50-minute mark and again whenever the app comes back to the foreground, because an access token lasts an hour and your sessions run two — it will expire mid-session every time.
 
-The deprecated endpoints (audio-features, audio-analysis, recommendations, related-artists, featured-playlists, category playlists, 30-second previews) must never be called — they 403 for any app registered after 2024-11-27, and ours was.
+While building it I found a service-worker bug that had nothing to do with Spotify and everything to do with why this phase would have failed: the worker was caching **every** network request, including cross-origin ones. Left alone, the app would have shown whatever track was playing the first time it ever asked, forever. Fixed — the cache is same-origin only now.
 
-You will need to be on the phone for the auth handshake at the end of that phase; I'll leave the steps here as usual.
+## Next up — Phase 6 (ducking)
+
+Voice cues cutting through music, and music always coming back. The spec calls this **the riskiest phase** and says to build the probe before the feature, for two reasons: `PUT /me/player/volume` returns 403 on many Connect devices (the Spotify iOS app is a frequent offender), and on iOS a web page playing audio can seize the audio session and pause Spotify by itself.
+
+So Phase 6 starts with a throwaway probe on your actual phone to find out which of those bite, before a line of real feature code gets written. Nothing to do until the Phase 5 gate above is signed off.
 
 ---
 
