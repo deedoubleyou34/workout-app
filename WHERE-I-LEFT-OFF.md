@@ -1,6 +1,6 @@
 # Where I left off — Hyperbolic Time Chamber
 
-**Last updated:** 2026-08-24 · **Live build:** 015 · **Status:** Phases 0–5 built and deployed. Every note you left in this file has been worked through and shipped, and Spotify is now wired up.
+**Last updated:** 2026-08-24 · **Live build:** 016 · **Status:** Phases 0–5 built and deployed. Every note you left in this file has been worked through and shipped, and Spotify is now wired up.
 
 ---
 
@@ -23,9 +23,9 @@
 
 Every input in the app is already a number field; there is **no text box anywhere in set entry**, and hasn't been since build 013. So what you saw was almost certainly build 012 still running on the phone.
 
-To make that answerable rather than guessable, the **build number now shows on the day screen and in the runner's top bar** (`b015`), and the field is labelled **Band (lb)**.
+To make that answerable rather than guessable, the **build number now shows on the day screen and in the runner's top bar** (`b016`), and the field is labelled **Band (lb)**.
 
-Next time it happens: tell me **the exercise name and the build number on screen**. If it says b015 and still shows a QWERTY keyboard, that's a real iOS bug and I'll work around it.
+Next time it happens: tell me **the exercise name and the build number on screen**. If it says b016 and still shows a QWERTY keyboard, that's a real iOS bug and I'll work around it.
 
 (One genuine bug did turn up next door: if a band value had ever been saved as a word rather than a number, the field came back blank instead of prefilled. Fixed.)
 
@@ -80,6 +80,7 @@ Only the `.sqlite` file can be imported back. The CSV is one-way.
 ### New in builds 014/015 — worth a look on your next session
 
 - [ ] A stretch or hold **starts counting on its own**. Does the auto-start land right, or do you want a longer set-up beat before it runs?
+- [ ] **Force-quit again, but this time in the middle of a hold.** You passed this on build 013, before holds had a clock — the resume path through a running timer is new code and needs its own run. Expect: the clock stops rather than logging a number you didn't earn, and if it ran past the target while the app was closed you get a warning line and confirm the seconds yourself.
 - [ ] Voice: is it **one flowing sentence** now, and is +18% the right speed? Too fast is as bad as too slow — tell me either way.
 - [ ] A **sled set** shows a weight box and a *Logged* button, no reps. Right shape?
 - [ ] Warm-up runs with **5 s between drills**. Too tight? Too loose?

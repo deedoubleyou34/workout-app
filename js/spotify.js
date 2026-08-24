@@ -249,8 +249,10 @@ export async function handleRedirect() {
 // Refresh on resume: a phone that slept through the timer wakes up with a
 // token that is already dead.
 export function watchForeground() {
-  document.addEventListener('visibilitychange', () => {
+  document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState !== 'visible') return;
+    // a cold launch straight into the runner may not have read the tokens yet
+    await loadAuth();
     if (!isConnected()) return;
     if (needsRefresh(auth.expires_at)) refresh().catch(() => {});
     else scheduleRefresh();

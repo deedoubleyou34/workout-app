@@ -251,12 +251,23 @@ export function renderRun(root, dayNo) {
         : effort ? 'one trip — log the weight'
         : tgt.value + ' reps'));
 
-    let clock = null, playBtn = null;
+    let clock = null, playBtn = null, staleNote = null;
+    // A hold restored from a force-quit whose target already elapsed while the
+    // app was dead: nobody knows how long he actually held it, so the clock
+    // stops and he confirms the number by hand.
+    const stale = timed && hold && hold.index === index && hold.running
+      && holdElapsedMs() >= tgt.value * 1000;
+    let edited = false;
     if (timed) {
       clock = el('div', 'holdclock', '');
       card.append(clock);
       playBtn = el('button', 'btn holdbtn', '');
       card.append(playBtn);
+      if (stale) {
+        staleNote = el('p', 'musicnote bad',
+          'The clock ran while the app was closed — check the seconds before logging.');
+        card.append(staleNote);
+      }
     }
 
     card.append(el('p', 'instruction', step.block.instruction));
@@ -292,6 +303,7 @@ export function renderRun(root, dayNo) {
       mainIn = numberInput('1');
       mainIn.inputMode = 'numeric';
       mainIn.value = tgt.value ?? '';
+      mainIn.addEventListener('input', () => { edited = true; });
       fields.append(labelled(tgt.kind === 'hold' ? 'Hold (s)'
         : tgt.kind === 'distance' ? 'Distance (m)' : 'Reps', mainIn));
     }
@@ -314,8 +326,9 @@ export function renderRun(root, dayNo) {
     function commit(elapsed) {
       let val = null;
       if (timed) {
-        // the clock is the source of truth unless it never ran
-        val = elapsed > 0 ? elapsed : Number(mainIn.value);
+        // the clock is the source of truth — never the prescribed number —
+        // unless he typed over it, or it ran on while the app was dead
+        val = (stale || edited) ? Number(mainIn.value) : elapsed;
         if (!Number.isFinite(val) || val < 0) return;
       } else if (!effort) {
         val = Number(mainIn.value);
@@ -347,13 +360,19 @@ export function renderRun(root, dayNo) {
     if (!hold || hold.index !== index) {
       hold = { index, startedAt: Date.now(), accMs: 0, running: true };
       save();
+    } else if (stale) {
+      hold = { index, startedAt: Date.now(), accMs: tgt.value * 1000, running: false };
+      save();
     }
     const paintHold = () => {
+      // go() clears `hold` on the way to the next step; a tick that lands
+      // after that must do nothing
+      if (!hold) return;
       const left = Math.max(tgt.value - Math.floor(holdElapsedMs() / 1000), 0);
       clock.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
       clock.classList.toggle('running', hold.running);
       playBtn.textContent = hold.running ? '⏸  Pause' : '▶  Start';
-      if (left === 0 && hold.running) {
+      if (left === 0 && hold.running && !stale) {
         hold.running = false;
         hold.accMs = tgt.value * 1000;
         if (ticker) { clearInterval(ticker); ticker = null; }
@@ -372,8 +391,8 @@ export function renderRun(root, dayNo) {
       save();
       paintHold();
     };
-    paintHold();
     ticker = setInterval(paintHold, 250);
+    paintHold();
   }
 
   function drawRest(step) {

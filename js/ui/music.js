@@ -52,6 +52,11 @@ export function renderMusic(container, { compact = false } = {}) {
       root.append(el('p', 'muted',
         'Playback control needs Spotify Premium — that is Spotify’s rule, not the app’s. '
         + 'The app only controls what is already playing; it never becomes a music player.'));
+      // The commonest reason a first login fails is a redirect URI in the
+      // Spotify dashboard that does not match this one character for
+      // character. Print it rather than make him guess it.
+      root.append(el('p', 'musicnote',
+        'Redirect URI (must match the Spotify dashboard exactly): ' + spotify.redirectUri()));
       return;
     }
 
@@ -145,7 +150,7 @@ export function renderMusic(container, { compact = false } = {}) {
       }
       note.textContent = err && err.message ? err.message : 'Spotify request failed.';
       note.classList.toggle('bad', true);
-      if (err && err.kind === 'expired') {
+      if (err && (err.kind === 'expired' || err.kind === 'auth_failed')) {
         const again = el('button', 'btn btn-small', 'Connect again');
         again.onclick = () => spotify.beginLogin();
         note.append(document.createTextNode(' '));
