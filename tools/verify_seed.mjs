@@ -3,7 +3,8 @@
 import { createRequire } from 'module';
 import { readFileSync } from 'fs';
 import { seed, EXERCISES, DAYS } from '../js/seed.js';
-import { buildSteps } from '../js/runner.js';
+import { buildSteps, stepTarget } from '../js/runner.js';
+import { setText, restText, cueId, slug, hasSecondsClip } from '../js/cues.js';
 
 const require = createRequire(import.meta.url);
 const initSqlJs = require('../vendor/sql-wasm.js');
@@ -96,9 +97,10 @@ for (const dn of [1, 2, 3, 4]) {
 }
 
 // -- session length, measured on the runner's ACTUAL step list --
-// Work model: holds at face value, reps at 3 s, distance at 2 s/m, plus 8 s of
-// transition per set. Rest comes from the steps themselves, so this tracks the
+// Work model: holds at face value, reps at 3 s, distance at 2 s/m, an untimed
+// 'effort' set (sled) at one 30 s trip, plus 8 s of transition per set. Rest comes from the steps themselves, so this tracks the
 // real ordering including the per-category main rests.
+const SLED_TRIP_SECONDS = 30;
 {
   const dayMins = (dayNo) => {
     const d = one('SELECT * FROM day_template WHERE day_no=?', [dayNo]);
@@ -111,7 +113,10 @@ for (const dn of [1, 2, 3, 4]) {
       if (s.kind === 'rest') secs += s.seconds;
       else if (s.kind === 'set') {
         const t = s.target;
-        secs += t.hold_seconds ? t.hold_seconds : t.distance_m ? t.distance_m * 2 : (t.reps || 0) * 3;
+        secs += t.hold_seconds ? t.hold_seconds
+          : t.distance_m ? t.distance_m * 2
+          : t.reps ? t.reps * 3
+          : SLED_TRIP_SECONDS;   // 'effort' set: one sled trip, no counted target
         secs += 8;
       }
     }
@@ -144,7 +149,8 @@ for (const b of day1) {
     rounds = Math.max(rounds, t.sets);
     if (t.hold_seconds) work += t.sets * t.hold_seconds;
     else if (t.distance_m) work += t.sets * t.distance_m * 2;
-    else work += t.sets * t.reps * repSec;
+    else if (t.reps) work += t.sets * t.reps * repSec;
+    else work += t.sets * SLED_TRIP_SECONDS;
   }
   total += work + rounds * b.rest + 15;
 }
@@ -162,30 +168,92 @@ const allowed = longNight.every(r =>
 check('nightly holds: only left-calf 90s and closing couch 120s exceed 60s', allowed,
   longNight.map(r => r.name + ' ' + r.side + ' ' + r.h + 's').join('; '));
 
-// -- audio: every seeded exercise must have a clip, or the runner goes quiet --
+// -- audio ------------------------------------------------------------------
+// Two coverage questions, and both matter:
+//   1. every whole-sentence cue the runner can reach has a clip, and
+//   2. the word-at-a-time fallback covers the values it CANNOT have a sentence
+//      for — an accepted progression moves a target off the seeded number, and
+//      a set with no clip is a silent set.
 {
-  let manifest = null;
+  let manifest = null, cues = null;
   try {
     manifest = JSON.parse(readFileSync('audio/manifest.json', 'utf8'));
+    cues = JSON.parse(readFileSync('audio/cues.json', 'utf8'));
   } catch {
-    check('audio/manifest.json exists (run tools/gen_audio.py)', false);
+    check('audio/manifest.json + audio/cues.json exist (node tools/gen_cues.mjs, python tools/gen_audio.py)', false);
   }
-  if (manifest) {
-    const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').replace(/_+/g, '_');
+
+  if (manifest && cues) {
+    const missingRendered = Object.keys(cues).filter((id) => !manifest[id]);
+    check('every cue in cues.json is rendered', missingRendered.length === 0,
+      missingRendered.slice(0, 5).join(', '));
+    const orphan = Object.keys(manifest).filter((id) => !(id in cues));
+    check('no clip in the manifest that cues.json no longer asks for', orphan.length === 0,
+      orphan.slice(0, 5).join(', '));
+
+    // 1. whole-sentence coverage, walked through the real runner
+    const missingSentences = [];
+    for (const d of all('SELECT * FROM day_template ORDER BY day_no')) {
+      const blocks = all(
+        'SELECT b.*, e.name ex_name, e.is_timed, e.load_type FROM block b ' +
+        'JOIN exercise e ON e.id=b.exercise_id WHERE b.day_template_id=? ORDER BY b.order_index', [d.id]);
+      for (const b of blocks) b.targets = all('SELECT * FROM block_target WHERE block_id=? ORDER BY id', [b.id]);
+      for (const step of buildSteps(blocks)) {
+        let text = null;
+        if (step.kind === 'set') {
+          const t = stepTarget(step);
+          text = setText({ name: step.label, side: step.side, targetKind: t.kind, targetValue: t.value });
+        } else if (step.kind === 'rest') {
+          text = restText(step.seconds, { main: step.main, nextCategory: step.nextCategory });
+        }
+        const id = cueId(text);
+        if (id && !manifest[id]) missingSentences.push(text);
+      }
+    }
+    check('every step of every day has a whole-sentence clip', missingSentences.length === 0,
+      missingSentences.slice(0, 3).join(' | '));
+
+    // 2. fallback coverage: name, side, unit, and every number a progression
+    //    can move a target to
     const names = all('SELECT name FROM exercise').map((r) => r.name);
-    const missing = names.filter((n) => !manifest['ex_' + slug(n)]);
-    check('every seeded exercise has a voice clip', missing.length === 0, missing.slice(0, 5).join('; '));
+    const missingNames = names.filter((n) => !manifest['ex_' + slug(n)]);
+    check('every exercise has a word-at-a-time name clip', missingNames.length === 0,
+      missingNames.slice(0, 5).join('; '));
 
     const structural = ['side_left', 'side_right', 'u_reps', 'u_seconds', 'u_meters',
       's_rest', 's_main_rest', 's_go', 's_ten_seconds', 's_last_set', 's_session_complete'];
     const missingPhrases = structural.filter((c) => !manifest[c]);
     check('structural cue clips present', missingPhrases.length === 0, missingPhrases.join(', '));
 
-    // every hold value the plan actually uses must have a natural spoken clip
-    const holds = all('SELECT DISTINCT hold_seconds h FROM block_target WHERE hold_seconds IS NOT NULL')
-      .map((r) => r.h);
-    const missingHolds = holds.filter((h) => !manifest['sec_' + h] && !(h >= 1 && h <= 50 && manifest['n_' + h]));
-    check('every prescribed hold length is speakable', missingHolds.length === 0, missingHolds.join(', '));
+    const missingNums = [];
+    for (let n = 1; n <= 50; n++) if (!manifest['n_' + n]) missingNums.push(n);
+    check('every rep count 1-50 is speakable', missingNums.length === 0, missingNums.slice(0, 6).join(', '));
+
+    const missingSecs = [];
+    for (let n = 5; n <= 180; n += 5) if (!manifest['sec_' + n]) missingSecs.push(n);
+    check('every 5-second hold value up to 3 minutes is speakable', missingSecs.length === 0,
+      missingSecs.slice(0, 6).join(', '));
+
+    // The discriminating case: accept a suggestion and the target is no longer
+    // a seeded number. Every one-increment step must still have audio.
+    const shifted = [];
+    const pairs = all(
+      'SELECT DISTINCT e.name, e.increment_value inc, e.increment_unit unit, t.reps, t.hold_seconds hold ' +
+      'FROM block_target t JOIN block b ON b.id=t.block_id JOIN exercise e ON e.id=b.exercise_id ' +
+      'WHERE e.increment_value IS NOT NULL');
+    for (const r of pairs) {
+      if (r.unit === 'rep' && r.reps != null) {
+        const to = r.reps + r.inc;
+        if (!manifest['n_' + to]) shifted.push(r.name + ' -> ' + to + ' reps');
+      }
+      if (r.unit === 'sec' && r.hold != null) {
+        const to = r.hold + r.inc;
+        if (!hasSecondsClip(to) || !manifest['sec_' + to]) shifted.push(r.name + ' -> ' + to + 's');
+      }
+    }
+    check('a target moved one increment by an accepted suggestion is still speakable',
+      shifted.length === 0, shifted.slice(0, 4).join('; '));
+
     check('120 s says "two minutes", not "one hundred twenty seconds"',
       manifest.sec_120 && /two minutes/i.test(manifest.sec_120.text),
       manifest.sec_120 && manifest.sec_120.text);

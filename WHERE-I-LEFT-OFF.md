@@ -1,10 +1,33 @@
 # Where I left off — Hyperbolic Time Chamber
 
-**Last updated:** 2026-08-23 · **Live build:** 013 · **Status:** Phases 0–1 done. Phases 2 (progression), 3 (runner) and 4 (voice cues) built and deployed. Everything outstanding needs Dom's hands on the phone — nothing is blocked on more code.
+**Last updated:** 2026-08-24 · **Live build:** 014 · **Status:** Phases 0–4 built and deployed. Every note you left in this file has been worked through and shipped. Phase 5 (Spotify) is next.
 
-## ❓ One question I could not answer
+---
 
-Your last message ended mid-sentence: **"Suggestions should be"**. I didn't guess. Tell me how you want suggestions to behave and I'll change it. Right now they are grouped per exercise on the home screen with left/right on separate lines, each with ✓ / ✕ / snooze, plus an **Accept all**.
+## What changed since you wrote your notes (build 014)
+
+| Your note | What I did |
+|---|---|
+| "Speed up audio… very choppy, says things in increments instead of a flowing sentence — '15' pause 'reps'" | **Cues are one clip per whole sentence now.** "Copenhagen plank. Left side. One minute." is a single recording, not four. Rate went from +8% to +18%. Short rests (the new 5 s warm-up gaps) say nothing at all. |
+| "Stretches or holds should start a timer automatically with a play/pause button in case more time is needed to set up" | **Holds time themselves.** The clock starts on its own, has a Pause/Start button, and logs the time you *actually* held — not the prescribed number. Force-quit mid-hold and it comes back with the time it had banked. |
+| "Sled pulls and pushes don't need a distance… just the sets with a weight section" | Sled push / march / backward drag now prescribe **sets + weight only**. The set screen shows a weight box and a Logged button. Suitcase carry keeps its 30 m — you only mentioned the sled. |
+| "Warm-up can be 5s rest in between each exercise" | Done. There is still a real 45 s break at the end of the warm-up before the knee work — a five-second hand-off into loaded work isn't what you asked for. Say the word and I'll drop that too. |
+| "Reset power level each week or for complete 4 day logged sessions and each night session logged" | Power level is now **this week only**, resetting Monday, with a line under it: *"this week · 2 of 4 training days · 5 nights · resets Monday"*. Your all-time number is shown beside it so the reset doesn't read as lost progress. |
+| "In sections that say band it still pulls up the full text keyboard" | See **the band keyboard** below — I need one more detail from you. |
+| "I don't have DBeaver anymore, only VS Code and SQL Server 2025" | Added an **Export .csv** button, and written instructions for both tools below. |
+| "Ignore the last sentence it was a mistake" | Ignored. The suggestions screen is unchanged. |
+
+---
+
+## ⚠️ The band keyboard — one thing I need from you
+
+Every input in the app is already a number field; there is **no text box anywhere in set entry**, and hasn't been since build 013. So what you saw was almost certainly build 012 still running on the phone.
+
+To make that answerable rather than guessable, the **build number now shows on the day screen and in the runner's top bar** (`b014`), and the field is labelled **Band (lb)**.
+
+Next time it happens: tell me **the exercise name and the build number on screen**. If it says b014 and still shows a QWERTY keyboard, that's a real iOS bug and I'll work around it.
+
+(One genuine bug did turn up next door: if a band value had ever been saved as a word rather than a number, the field came back blank instead of prefilled. Fixed.)
 
 ---
 
@@ -18,39 +41,52 @@ Your last message ended mid-sentence: **"Suggestions should be"**. I didn't gues
 | Spotify Client ID | `cf46be5104434a87948db209215d61f7` (redirect URI = the Pages URL exactly; no secret, PKCE) |
 | Name | **Hyperbolic Time Chamber** (icon label "Chamber") |
 
-The parent folder holds reference copies of `workout_plan.txt`, `PROJECT_SPEC.md`, `CLAUDE.md`. **The copies inside `workout-app/` are canonical** — keep the parent copies in sync at phase boundaries.
+The parent folder holds reference copies of `workout_plan.txt`, `PROJECT_SPEC.md`, `CLAUDE.md`. **The copies inside `workout-app/` are canonical** — the parent copies are synced at phase boundaries.
 
 ---
 
-## ⚠️ Waiting on Dom — do these on the iPhone
+## 📤 Getting your data out (DBeaver replacement)
 
-**The home-screen icon still says "Train."** iOS caches that label at install time. To pick up the new name: press and hold the icon → Remove from Home Screen, then reopen the Pages URL in Safari → Share → Add to Home Screen. Nothing else needs a reinstall; normal updates still arrive on their own.
+Two exports, for two different jobs.
 
-### Phase 2 gate (progression engine)
-- [ ] Home screen → **Run progression tests →** at the bottom, in Safari on the phone. Expect **ALL 53 TESTS PASSED**. Screenshot anything that fails.
-- [ ] Log a day clean, finish it → home should now say *"that's 1 of 2"* rather than showing nothing.
-- [ ] Log the same day clean a second time → grouped suggestions appear.
-- [ ] **Accept** one → reopen that day, the prefilled weight should show the new number.
-- [ ] **Decline** another → load unchanged, and it should not come back next session.
-- [ ] Read the suggestion wording and tell me if it reads like plain English.
+### Look at your data — **Export .csv** (new)
+Home screen → Data → **Export .csv**. One flat row per logged set, already joined to the session date, day number, block, and exercise name. No SQL needed.
 
-### Phase 3 gate (session runner) — needs one real Day 4
-- [ ] Run a full Day 4 start to finish with the runner (home → **▶ Run Day 4**, then **Start**).
-- [ ] Rest timer accurate within ±3 s over the whole session — start a stopwatch at session start, compare at the end.
-- [ ] Screen never sleeps during the session; note the battery % used over ~95 min.
-- [ ] Force-quit mid-session, reopen → resumes at the exact set with earlier sets intact.
-- [ ] Every unilateral block leads with the correct side (left for the hip-flexor/ankle work, right for glute-med work).
-- [ ] No set required typing beyond confirming the prefilled numbers.
+- **VS Code**: just open the file. For a nicer table view, install the *Rainbow CSV* extension (`mechatroner.rainbow-csv`) — it colours the columns and lets you run queries over the CSV with `Ctrl+Shift+P → Rainbow CSV: Query`.
+- **SQL Server 2025 / SSMS**: right-click your database → **Tasks → Import Flat File…** → pick the CSV → it infers the columns and creates the table. Then query it like anything else.
 
-### Phase 4 gate (voice cues) — can ride along with the Day 1 run
-- [ ] Full session with voice only, phone in your pocket between sets, no missed cues.
-- [ ] **Airplane mode → cues still play.** Give the app a minute on wifi first so the service worker can pull all 139 clips (~1.7 MB), then switch off and run a few steps.
-- [ ] Long holds sound right: 120 s should say *"two minutes"*, 90 s *"a minute thirty"* — not "one hundred twenty seconds".
-- [ ] The ten-second rest warning lands within about a second of true.
-- [ ] Any exercise name that sounds wrong or clumsy — tell me the name and I'll re-record just that clip.
+### Back up and restore — **Export .sqlite** (unchanged, and this is the real gate item)
+SQL Server cannot open a `.sqlite` file at all — different format, no converter in the box. Use VS Code:
 
-### Deferred from Phase 1 (needs a PC, agreed not to block)
-- [ ] Export `.sqlite` from the home screen → open in DBeaver → confirm `set_log` holds your sets → Import the same file back into the app.
+1. Install the **SQLite Viewer** extension (`qwtel.sqlite-viewer`) — then just click the `.sqlite` file and browse the tables.
+2. Or install **SQLite** (`alexcvzz.vscode-sqlite`) if you want to run queries: `Ctrl+Shift+P` → *SQLite: Open Database* → pick the file → the **SQLITE EXPLORER** panel appears in the sidebar → right-click `set_log` → *Show Table*.
+
+**The check that actually matters** (the deferred Phase 1 gate item):
+- [ ] Export `.sqlite` from the home screen → open it in VS Code → confirm `set_log` holds your sets → **Import** that same file back into the app and confirm nothing was lost.
+
+Only the `.sqlite` file can be imported back. The CSV is one-way.
+
+---
+
+## ⚠️ Still waiting on you — on the iPhone
+
+**The home-screen icon still says "Train."** iOS caches that label at install time. Press and hold the icon → Remove from Home Screen, then reopen the Pages URL in Safari → Share → Add to Home Screen. Nothing else needs a reinstall.
+
+### Your two unfinished items
+
+- [ ] **Run the tests in Safari on the phone.** Home screen → *Run progression tests →* at the bottom. Expect **ALL 71 TESTS PASSED** (the old note said 53 — that number was stale, not a failure). Screenshot anything that fails.
+- [ ] **Rest-timer accuracy, ±3 s over a whole session.** Start a stopwatch when the session starts, compare at the end. This one needs re-running regardless: the rest values changed in this build, so any earlier measurement is void.
+
+### New in build 014 — worth a look on your next session
+
+- [ ] A stretch or hold **starts counting on its own**. Does the auto-start land right, or do you want a longer set-up beat before it runs?
+- [ ] Voice: is it **one flowing sentence** now, and is +18% the right speed? Too fast is as bad as too slow — tell me either way.
+- [ ] A **sled set** shows a weight box and a *Logged* button, no reps. Right shape?
+- [ ] Warm-up runs with **5 s between drills**. Too tight? Too loose?
+- [ ] Home screen: does the **weekly power level** read the way you meant it?
+- [ ] Any exercise name that still sounds wrong or clumsy — give me the name and I'll re-record just that clip.
+
+**Airplane-mode note:** the clip library grew from 1.7 MB to 4.4 MB. Give the app a couple of minutes on wifi after this update before you rely on offline cues.
 
 ---
 
@@ -59,61 +95,47 @@ The parent folder holds reference copies of `workout_plan.txt`, `PROJECT_SPEC.md
 ### Phase 0 — hosting and shell (COMPLETE)
 Installed PWA, opens offline, updates reach the phone in ~45–60 s automatically. Two permanent fixes: service-worker install fetches use `{ cache: 'reload' }` (Pages serves `max-age=600`, so a new cache was being rebuilt from stale files), and the app checks for updates itself on launch and on `visibilitychange` (iOS standalone PWAs never check on resume). `.nojekyll` in the repo root is required or deploys silently stop landing.
 
-### Phase 1 — database and manual logging (COMPLETE except the DBeaver check)
-sql.js vendored, SQLite persisted to IndexedDB, forward-only migrations. Seed: 63 exercises, 5 day templates, 90 blocks, per-block bias sides, separate L/R targets, Appendix A instruction + feel cue on every exercise. Export/import ships here.
+### Phase 1 — database and manual logging (COMPLETE except the export round-trip above)
+sql.js vendored, SQLite persisted to IndexedDB, forward-only migrations (now at v5). Seed: 63 exercises, 5 day templates, 90 blocks, per-block bias sides, separate L/R targets, Appendix A instruction + feel cue on every exercise.
 
-### Phase 2 — progression engine (built; gate not yet run)
-`js/progression.js`: two clean sessions → `increase`; one miss → nothing; two → `hold`; three → `reduce`. Warm-ups and mobility never progress. **Accept is the only thing that writes `current_load`.** `add_load` replaces `increase` at the ceilings (hold at 120 s, band at +3 reps, knee work at +6 reps); power work only ever gets a `review` note. Decline suppresses a flag until two fresh clean sessions; Snooze deliberately does not.
+### Phase 2 — progression engine (built; ✅ mostly verified by you)
+Two clean sessions → `increase`; one miss → nothing; two → `hold`; three → `reduce`. Warm-ups and mobility never progress. **Accept is the only thing that writes `current_load`.** `add_load` replaces `increase` at the ceilings; power work only ever gets a `review` note. You confirmed the "1 of 2" line, grouped suggestions, Accept, Decline, and the wording all behave.
 
-Three bugs found and fixed in build 010:
-1. First suggestion on a weighted lift built on zero — read *"try 5 lb."* Now builds on the weight actually logged.
-2. `acceptFlag` ignored snoozed flags, so Accept on a snoozed card silently did nothing.
-3. Two clean sessions produced 16 separate cards; suggestions are now grouped per exercise with an **Accept all**.
+### Phase 3 — session runner (built; ✅ mostly verified by you)
+You confirmed a full Day 4 through the runner, the screen never sleeping, force-quit resume, and the correct side leading every unilateral block. `js/runner.js` builds the step list as a **pure function**, so ordering is tested without a DOM or a clock.
 
-### Phase 3 — silent session runner (built; gate not yet run)
-`js/runner.js` builds the ordered step list as a **pure function**, so ordering is tested without a DOM or clock: supersets alternate a→b→rest per round, the biased side always leads, a side whose sets are used up is never offered again (4 left / 3 right yields no 4th right set), and a session never ends on a rest step. Day 4 comes out to 76 set steps and 41 rests, ~40 min of prescribed rest.
+### Phase 4 — voice cues (built; rebuilt in 014)
+285 clips committed to the repo — 123 whole sentences and 162 word-at-a-time pieces. The pieces are the fallback: when you accept a progression the target moves off the seeded number ("14 reps") and no sentence clip exists for it, so the runner speaks it word by word rather than going silent. `tools/verify_seed.mjs` checks both paths.
 
-`js/ui/run.js` is the full-screen runner: one large **Done** button with weight/reps prefilled, a rest countdown computed from `Date.now()` deltas (repainted on `visibilitychange`, so iOS throttling can't make it drift), Screen Wake Lock acquired on entry and re-acquired on resume with a visible indicator when the lock is **not** held, position saved to `meta.runner_state` after every step for exact resume, and a summary screen that lists misses and raises flags on finish.
-
-Also fixed here: an app update no longer reloads mid-session — the reload waits until you leave the runner.
-
----
-
-## Build 010 — home dashboard and session lifecycle (Dom's direction)
-
-- **Home is a real dashboard**: power level, a **Next up** card (which day is due, cycling 1→2→3→4→1, ignoring nightly, with "last trained N days ago"), suggestions, day list with last-trained chips, nightly streak.
-- **"How does it reset?"** — a session belongs to (day, date), so opening a day on a new date is automatically a clean slate. Nothing to press.
-- **Start over** on a day abandons the current session and opens a fresh one. Nothing is deleted; abandoned work stays in history but never reaches the progression engine.
-- **↻ refresh** on the day screen re-reads the database and checks for an app update.
+Regenerating audio after changing exercises:
+```
+cd Projects/Workout/workout-app
+pip install -r tools/requirements.txt     # once
+node tools/gen_cues.mjs                   # what to say -> audio/cues.json
+python tools/gen_audio.py                 # renders only what is missing
+python tools/gen_audio.py --force --prune # re-record everything, drop the stale
+```
 
 ---
 
 ## Open questions for Dom
 
 1. ~~Side plank with abduction (Day 2)~~ — **confirmed correct**: right 3×10 / left 2×10.
-2. Sled/carry distances log through a field labelled "Distance (m)" — `set_log` has no distance column, so a metre is stored as a rep against a metre target.
-3. Nightly drills log one value per side per night (habit tracker), not per-set.
-4. Warm-up rest is 30 s after **every** drill, which is what the plan says but makes the warm-up long in the runner — worth checking how it feels in practice.
+2. ~~Sled distances~~ — **done**: sets + weight, no distance.
+3. Nightly drills log one value per side per night (habit tracker), not per-set. Still fine?
+4. ~~Warm-up rest~~ — **done**: 5 s between drills, 45 s before the working blocks.
 
 ---
 
-## Phase 4 — voice cues (built; gate not yet run)
+## Next up — Phase 5 (Spotify)
 
-139 clips rendered with `edge-tts` (voice `en-US-AndrewNeural`) and committed. The runner announces the exercise with its side and target, announces rest (naming the main rest and what's next), warns at ten seconds, says "go", and calls the session complete. Instructions and feel cues are **never spoken** — they stay on-screen text, as specified.
+Authorization Code with **PKCE** (no client secret, since the app is public), token refresh on a timer sized for a two-hour session, and **playback control only** — the app never becomes a music player. Requires a Premium account for playback control; that is Spotify's rule, not a design choice.
 
-The runner now opens behind a **Start** tap: iOS keeps audio muted until a tap has produced sound, so that tap unlocks audio, preloads the session's clips and takes the wake lock. There's a "Start without voice" option.
+The deprecated endpoints (audio-features, audio-analysis, recommendations, related-artists, featured-playlists, category playlists, 30-second previews) must never be called — they 403 for any app registered after 2024-11-27, and ours was.
 
-Regenerating audio after changing exercises is one command:
-```
-cd Projects/Workout/workout-app
-pip install -r tools/requirements.txt     # once
-python tools/gen_audio.py                 # only renders what's missing
-python tools/gen_audio.py --force         # re-record everything
-```
+You will need to be on the phone for the auth handshake at the end of that phase; I'll leave the steps here as usual.
 
-## Next up — Phase 5 (not started)
-
-Spotify auth and playback control: Authorization Code with PKCE (no secret), token refresh on a timer sized for a two-hour session, and player control only. The deprecated endpoints (audio-features, audio-analysis, recommendations, related-artists, featured-playlists, category playlists, 30-second previews) must never be called — they 403 for any app registered after 2024-11-27.
+---
 
 ## Deploy loop
 

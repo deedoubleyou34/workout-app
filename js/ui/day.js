@@ -45,7 +45,14 @@ function targetText(t, isTimed) {
   const side = t.side === 'both' ? '' : t.side[0].toUpperCase() + ' ';
   if (t.distance_m) return side + t.sets + '×' + t.distance_m + 'm';
   if (isTimed || t.hold_seconds) return side + t.sets + '×' + (effHold(t) || '?') + 's';
+  // sled work: sets and weight, no counted target (Dom, 2026-08-24)
+  if (isEffort(t)) return side + t.sets + ' × load';
   return side + t.sets + '×' + effReps(t);
+}
+
+// No reps, no hold, no distance: doing the set IS the set.
+function isEffort(t) {
+  return t.reps == null && t.hold_seconds == null && t.distance_m == null;
 }
 
 // Accepted progression suggestions live in current_load and override the
@@ -169,7 +176,7 @@ export function renderDay(root, dayNo) {
     titleRow.append(el('span', 'chip chip-' + session.status, session.status.replace('_', ' ')));
   }
   header.append(titleRow);
-  header.append(el('p', 'muted', day.name));
+  header.append(el('p', 'muted', day.name + ' · build ' + (window.BUILD || '?')));
 
   if (!isNightly) {
     const done = lastCompleted(getDb(), dayNo);
@@ -325,7 +332,9 @@ export function renderDay(root, dayNo) {
         if (logged) {
           label = logged.hold_seconds_done != null
             ? logged.hold_seconds_done + 's'
-            : (logged.weight_lb ? logged.weight_lb + '×' : '') + logged.reps_done;
+            : logged.reps_done == null
+              ? (logged.weight_lb ? logged.weight_lb + ' lb' : '✓')
+              : (logged.weight_lb ? logged.weight_lb + '×' : '') + logged.reps_done;
         }
         const btn = el('button', 'setbtn' + (logged ? (logged.hit_target ? ' hit' : ' miss') : ''), label);
         btn.onclick = () => openSheet(b, t, i, logged || null);
@@ -362,6 +371,7 @@ export function renderDay(root, dayNo) {
       (isNightly ? '' : ' · set ' + setIndex + '/' + target.sets)));
 
     const isDist = !!target.distance_m;
+    const effort = isEffort(target) && !isNightly;
     // per-target, not per-exercise: 90/90 mixes reps and per-side holds
     const isTimed = !!block.is_timed || target.hold_seconds != null;
     const showWeight = !isNightly && !['bodyweight', 'board', 'band'].includes(block.load_type);
@@ -388,15 +398,21 @@ export function renderDay(root, dayNo) {
       bandIn = document.createElement('input');
       bandIn.type = 'number'; bandIn.inputMode = 'decimal'; bandIn.step = '5'; bandIn.min = '0';
       bandIn.placeholder = 'band lb';
+      bandIn.autocomplete = 'off';
+      bandIn.setAttribute('autocorrect', 'off');
+      bandIn.setAttribute('spellcheck', 'false');
       const prev2 = existing?.band_level ?? approved.band_level ?? query(
         'SELECT band_level FROM set_log WHERE exercise_id=? AND side=? AND band_level IS NOT NULL ORDER BY id DESC LIMIT 1',
         [block.exercise_id, target.side])[0]?.band_level;
-      if (prev2 != null) bandIn.value = prev2;
-      fields.append(label('Band', bandIn));
+      // a legacy value like "green" is not a number: leave the field empty
+      // rather than hand a number input something it will silently drop
+      if (prev2 != null && Number.isFinite(Number(prev2))) bandIn.value = Number(prev2);
+      fields.append(label('Band (lb)', bandIn));
     }
 
     const mainIn = document.createElement('input');
     mainIn.type = 'number'; mainIn.inputMode = 'numeric'; mainIn.min = '0';
+    mainIn.autocomplete = 'off';
     const mainLabel = isDist ? 'Distance (m)' : isTimed ? 'Hold (seconds)' : 'Reps';
     const tgtHold = effHold(target);
     const tgtReps = effReps(target);
@@ -407,7 +423,7 @@ export function renderDay(root, dayNo) {
     } else {
       mainIn.value = isDist ? target.distance_m : isTimed ? tgtHold : tgtReps;
     }
-    fields.append(label(mainLabel, mainIn));
+    if (!effort) fields.append(label(mainLabel, mainIn));
     sheet.append(fields);
 
     const row = el('div', 'btnrow');
@@ -415,8 +431,8 @@ export function renderDay(root, dayNo) {
     const cancel = el('button', 'btn', 'Cancel');
     cancel.onclick = () => sheet.remove();
     save.onclick = async () => {
-      const val = Number(mainIn.value);
-      if (!Number.isFinite(val) || val < 0) return;
+      const val = effort ? null : Number(mainIn.value);
+      if (!effort && (!Number.isFinite(val) || val < 0)) return;
       if (isNightly) {
         await exec(
           'INSERT OR REPLACE INTO nightly_log (date, drill, side, value, unit) VALUES (?,?,?,?,?)',
@@ -425,8 +441,9 @@ export function renderDay(root, dayNo) {
       } else {
         const s = await getOrCreateSession();
         const targetReps = isDist ? target.distance_m : tgtReps;
-        const hit = isTimed
-          ? (val >= (tgtHold || 0) ? 1 : 0)
+        // a sled set carries no counted target: doing it IS the set
+        const hit = effort ? 1
+          : isTimed ? (val >= (tgtHold || 0) ? 1 : 0)
           : (val >= (targetReps || 0) ? 1 : 0);
         // set_log is append-only: a re-log of the same set is a new row + note
         await exec(
@@ -435,10 +452,10 @@ export function renderDay(root, dayNo) {
           'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
           [s.id, block.id, block.exercise_id, target.side, setIndex,
             wIn && wIn.value !== '' ? Number(wIn.value) : null,
-            bandIn && bandIn.value !== '' ? bandIn.value : null,
-            isTimed ? null : val,
+            bandIn && bandIn.value !== '' ? String(Number(bandIn.value)) : null,
+            isTimed || effort ? null : val,
             isTimed ? val : null,
-            isTimed ? null : targetReps,
+            isTimed || effort ? null : targetReps,
             isTimed ? tgtHold : null,
             hit,
             existing ? 'correction of earlier entry' : null,
@@ -450,7 +467,7 @@ export function renderDay(root, dayNo) {
     row.append(save, cancel);
     sheet.append(row);
     root.append(sheet);
-    mainIn.focus();
+    if (!effort) mainIn.focus();
   }
 
   function label(text, input) {

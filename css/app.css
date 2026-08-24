@@ -485,3 +485,30 @@ html, body {
 
 .gatecard { padding: 28px 16px; }
 .gatecard .nextname { text-align: center; margin-top: 4px; }
+
+/* ---- hold clock (build 014): stretches and holds time themselves ---- */
+.holdclock {
+  font-size: 3.4rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  margin: 6px 0 2px;
+  transition: color 0.2s ease;
+}
+.holdclock.running {
+  color: var(--gold);
+  text-shadow: 0 0 24px rgba(255, 215, 94, 0.45);
+}
+.holdbtn {
+  min-height: 44px;
+  margin: 0 auto 6px;
+  padding: 0 22px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.weekline {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  margin-top: 2px;
+}

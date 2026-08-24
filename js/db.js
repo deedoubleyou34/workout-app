@@ -39,6 +39,16 @@ export const MIGRATIONS = [
       reseedAndRemap(db);
     },
   },
+  {
+    // v5 (build 014): warm-up drills rest 5 s between each, and sled push /
+    // march / backward drag lose their distance — sets and weight only
+    // (Dom, 2026-08-24). Both live in the seed, so the library is rebuilt and
+    // logged sets are remapped onto the new block ids.
+    version: 5,
+    run(db) {
+      reseedAndRemap(db);
+    },
+  },
 ];
 // MIGRATIONS must stay in ascending version order — they are applied in array
 // order and each one bumps the stored version, so an out-of-order entry would
@@ -207,6 +217,31 @@ export function exportJsonBlob() {
     out[name] = query('SELECT * FROM ' + name);
   }
   return new Blob([JSON.stringify(out, null, 1)], { type: 'application/json' });
+}
+
+// Every logged set as one flat table. Dom no longer has DBeaver (2026-08-24):
+// a CSV opens in VS Code, Excel, or SQL Server's import wizard, none of which
+// can read a .sqlite file. The .sqlite export stays as the real backup — it is
+// the only one that can be imported back into the app.
+export function exportCsvBlob() {
+  const rows = query(
+    'SELECT s.date, s.day_no, s.status session_status, b.block_code, e.name exercise, ' +
+    'l.side, l.set_index, l.weight_lb, l.band_level band_lb, l.reps_done, l.hold_seconds_done, ' +
+    'l.target_reps, l.target_hold_seconds, l.hit_target, l.notes, l.logged_at ' +
+    'FROM set_log l JOIN session s ON s.id = l.session_id ' +
+    'JOIN block b ON b.id = l.block_id JOIN exercise e ON e.id = l.exercise_id ' +
+    'ORDER BY l.id');
+  const cols = ['date', 'day_no', 'session_status', 'block_code', 'exercise', 'side', 'set_index',
+    'weight_lb', 'band_lb', 'reps_done', 'hold_seconds_done', 'target_reps', 'target_hold_seconds',
+    'hit_target', 'notes', 'logged_at'];
+  const cell = (v) => {
+    if (v == null) return '';
+    const t = String(v);
+    return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+  };
+  const lines = [cols.join(',')];
+  for (const r of rows) lines.push(cols.map((c) => cell(r[c])).join(','));
+  return new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/csv' });
 }
 
 const SQLITE_MAGIC = 'SQLite format 3';

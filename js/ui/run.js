@@ -89,14 +89,27 @@ export function renderRun(root, dayNo) {
   let ticker = null;
   let warnedAt = null;   // which rest already got its ten-second warning
 
+  // A hold runs its own clock: { index, startedAt, accMs, running }. It is
+  // pausable (Dom asked for a play/pause so a stretch can be set up first), so
+  // one startedAt is not enough — elapsed is accumulated across pauses and
+  // saved with the rest of the runner state, or a force-quit mid-hold would
+  // come back at zero.
+  let hold = saved && saved.hold ? saved.hold : null;
+
+  function holdElapsedMs() {
+    if (!hold) return 0;
+    return hold.accMs + (hold.running ? Date.now() - hold.startedAt : 0);
+  }
+
   function save() {
-    saveRunnerState(db, { session_id: session.id, index, restStartedAt });
+    saveRunnerState(db, { session_id: session.id, index, restStartedAt, hold });
     persist();
   }
 
   function go(next) {
     index = Math.max(0, Math.min(next, steps.length - 1));
     restStartedAt = steps[index] && steps[index].kind === 'rest' ? Date.now() : null;
+    hold = null;
     save();
     draw();
     cueFor(steps[index]);
@@ -106,10 +119,8 @@ export function renderRun(root, dayNo) {
   function cueFor(step) {
     if (!step || !audio.isUnlocked()) return;
     if (step.kind === 'set') {
-      const tgt = stepTarget(step, loadFor(step));
       audio.play(audio.announceSet({
-        name: step.label, side: step.side,
-        targetKind: tgt.kind, targetValue: tgt.value,
+        name: step.label, side: step.side, ...targetOf(step),
         setIndex: step.setIndex, totalSets: step.totalSets,
       }));
     } else if (step.kind === 'rest') {
@@ -121,16 +132,20 @@ export function renderRun(root, dayNo) {
 
   // decode the clips this session will actually use, so the first cue is on time
   function preloadCues() {
-    const ids = new Set(['s_rest', 's_main_rest', 's_go', 's_ten_seconds',
-      's_last_set', 's_session_complete', 'side_left', 'side_right', 'u_reps', 'u_seconds', 'u_meters']);
-    for (const s of steps) {
-      if (s.kind !== 'set') continue;
-      ids.add(audio.exerciseClip(s.label));
-      const tgt = stepTarget(s, loadFor(s));
-      if (Number.isInteger(tgt.value) && tgt.value >= 1 && tgt.value <= 50) ids.add('n_' + tgt.value);
-      if ([45, 60, 75, 90, 105, 120].includes(tgt.value)) ids.add('sec_' + tgt.value);
+    const ids = new Set(['s_go', 's_ten_seconds', 's_last_set', 's_session_complete']);
+    for (const st of steps) {
+      const cueStep = st.kind === 'set'
+        ? { ...st, name: st.label, ...targetOf(st) }
+        : st;
+      for (const id of audio.cueIdsFor(cueStep)) ids.add(id);
     }
     audio.preload([...ids]);
+  }
+
+  // the shape js/cues.js speaks from
+  function targetOf(step) {
+    const tgt = stepTarget(step, loadFor(step));
+    return { targetKind: tgt.kind, targetValue: tgt.value };
   }
 
   // ---------- start gate ----------
@@ -196,7 +211,8 @@ export function renderRun(root, dayNo) {
       location.hash = '#/day/' + dayNo;
     };
     bar.append(quit);
-    bar.append(el('span', 'runprogress', 'Day ' + dayNo + ' · ' + done + '/' + total + ' sets'));
+    bar.append(el('span', 'runprogress', 'Day ' + dayNo + ' · ' + done + '/' + total
+      + ' sets · b' + (window.BUILD || '?')));
     const status = el('span', 'lockdot' + (wakeLockLost ? ' lost' : ''),
       (audio.isUnlocked() ? '🔊' : '🔇') + ' ' + (wakeLockLost ? 'screen may sleep' : 'screen held'));
     bar.append(status);
@@ -216,14 +232,31 @@ export function renderRun(root, dayNo) {
   function drawSet(step) {
     const load = loadFor(step);
     const tgt = stepTarget(step, load);
+    // Stretches and holds run their own countdown (Dom, 2026-08-24): the clock
+    // starts on its own, pauses if the set-up takes longer, and logs the time
+    // ACTUALLY held — never the prescribed number, or a paused hold would
+    // report itself as a hit.
+    const timed = tgt.kind === 'hold' && tgt.value > 0;
+    const effort = tgt.kind === 'effort';
     const card = el('section', 'runcard');
 
     const side = SIDE_WORD[step.side];
     if (side) card.append(el('div', 'runside', side));
     card.append(el('h1', 'runex', step.label));
     card.append(el('p', 'runset', 'Set ' + step.setIndex + ' of ' + step.totalSets));
-    card.append(el('p', 'runtarget', tgt.value + (tgt.kind === 'hold' ? 's hold'
-      : tgt.kind === 'distance' ? ' m' : ' reps')));
+    card.append(el('p', 'runtarget',
+      tgt.kind === 'hold' ? tgt.value + 's hold'
+        : tgt.kind === 'distance' ? tgt.value + ' m'
+        : effort ? 'one trip — log the weight'
+        : tgt.value + ' reps'));
+
+    let clock = null, playBtn = null;
+    if (timed) {
+      clock = el('div', 'holdclock', '');
+      card.append(clock);
+      playBtn = el('button', 'btn holdbtn', '');
+      card.append(playBtn);
+    }
 
     card.append(el('p', 'instruction', step.block.instruction));
     card.append(el('p', 'feelcue', 'Feel: ' + step.block.feel_cue));
@@ -235,54 +268,38 @@ export function renderRun(root, dayNo) {
     let wIn = null, bandIn = null;
 
     if (showWeight) {
-      wIn = document.createElement('input');
-      wIn.type = 'number'; wIn.inputMode = 'decimal'; wIn.step = '2.5'; wIn.min = '0';
+      wIn = numberInput('2.5');
       const prev = load.weight_lb ?? query(
         'SELECT weight_lb FROM set_log WHERE exercise_id=? AND side=? AND weight_lb IS NOT NULL ORDER BY id DESC LIMIT 1',
         [step.block.exercise_id, step.side])[0]?.weight_lb;
-      if (prev != null) wIn.value = prev;
+      if (prev != null && Number.isFinite(Number(prev))) wIn.value = Number(prev);
       fields.append(labelled('Weight (lb)', wIn));
     }
     if (showBand) {
       // bands are logged by their pound rating — always a number, never text
-      bandIn = document.createElement('input');
-      bandIn.type = 'number'; bandIn.inputMode = 'decimal'; bandIn.step = '5'; bandIn.min = '0';
+      bandIn = numberInput('5');
       const prev = load.band_level ?? query(
         'SELECT band_level FROM set_log WHERE exercise_id=? AND side=? AND band_level IS NOT NULL ORDER BY id DESC LIMIT 1',
         [step.block.exercise_id, step.side])[0]?.band_level;
-      if (prev != null) bandIn.value = prev;
-      fields.append(labelled('Band', bandIn));
+      // a legacy value like "green" is not a number: leave the field empty
+      // rather than hand a number input something it will silently drop
+      if (prev != null && Number.isFinite(Number(prev))) bandIn.value = Number(prev);
+      fields.append(labelled('Band (lb)', bandIn));
     }
-    const mainIn = document.createElement('input');
-    mainIn.type = 'number'; mainIn.inputMode = 'numeric'; mainIn.min = '0';
-    mainIn.value = tgt.value ?? '';
-    fields.append(labelled(tgt.kind === 'hold' ? 'Hold (s)' : tgt.kind === 'distance' ? 'Distance (m)' : 'Reps', mainIn));
+    let mainIn = null;
+    if (!effort) {
+      mainIn = numberInput('1');
+      mainIn.inputMode = 'numeric';
+      mainIn.value = tgt.value ?? '';
+      fields.append(labelled(tgt.kind === 'hold' ? 'Hold (s)'
+        : tgt.kind === 'distance' ? 'Distance (m)' : 'Reps', mainIn));
+    }
     card.append(fields);
     root.append(card);
 
-    const done = el('button', 'btn btn-primary donebtn', 'Done');
-    done.onclick = () => {
-      const val = Number(mainIn.value);
-      if (!Number.isFinite(val) || val < 0) return;
-      const isHold = tgt.kind === 'hold';
-      logSet(db, {
-        session_id: session.id,
-        block_id: step.block.id,
-        exercise_id: step.block.exercise_id,
-        side: step.side,
-        set_index: step.setIndex,
-        weight_lb: wIn && wIn.value !== '' ? Number(wIn.value) : null,
-        band_level: bandIn && bandIn.value !== '' ? bandIn.value : null,
-        reps_done: isHold ? null : val,
-        hold_seconds_done: isHold ? val : null,
-        target_reps: isHold ? null : tgt.value,
-        target_hold_seconds: isHold ? tgt.value : null,
-        hit_target: val >= (tgt.value ?? 0),
-      });
-      logged.add(step.block.id + '|' + step.side + '|' + step.setIndex);
-      go(index + 1);
-    };
-    root.append(done);
+    const doneBtn = el('button', 'btn btn-primary donebtn', effort ? 'Logged' : 'Done');
+    doneBtn.onclick = () => commit(timed ? Math.round(holdElapsedMs() / 1000) : null);
+    root.append(doneBtn);
 
     const nav = el('div', 'runnav');
     const back = el('button', 'btn btn-small', '‹ back');
@@ -292,6 +309,70 @@ export function renderRun(root, dayNo) {
     skip.onclick = () => go(index + 1);
     nav.append(back, skip);
     root.append(nav);
+
+    function commit(elapsed) {
+      let val = null;
+      if (timed) {
+        // the clock is the source of truth unless it never ran
+        val = elapsed > 0 ? elapsed : Number(mainIn.value);
+        if (!Number.isFinite(val) || val < 0) return;
+      } else if (!effort) {
+        val = Number(mainIn.value);
+        if (!Number.isFinite(val) || val < 0) return;
+      }
+      const isHold = tgt.kind === 'hold';
+      logSet(db, {
+        session_id: session.id,
+        block_id: step.block.id,
+        exercise_id: step.block.exercise_id,
+        side: step.side,
+        set_index: step.setIndex,
+        weight_lb: wIn && wIn.value !== '' ? Number(wIn.value) : null,
+        band_level: bandIn && bandIn.value !== '' ? String(Number(bandIn.value)) : null,
+        reps_done: isHold || effort ? null : val,
+        hold_seconds_done: isHold ? val : null,
+        target_reps: isHold || effort ? null : tgt.value,
+        target_hold_seconds: isHold ? tgt.value : null,
+        // a sled set carries no counted target: doing it IS the set
+        hit_target: effort ? true : val >= (tgt.value ?? 0),
+      });
+      logged.add(step.block.id + '|' + step.side + '|' + step.setIndex);
+      go(index + 1);
+    }
+
+    if (!timed) return;
+
+    // ---- the hold clock ----
+    if (!hold || hold.index !== index) {
+      hold = { index, startedAt: Date.now(), accMs: 0, running: true };
+      save();
+    }
+    const paintHold = () => {
+      const left = Math.max(tgt.value - Math.floor(holdElapsedMs() / 1000), 0);
+      clock.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+      clock.classList.toggle('running', hold.running);
+      playBtn.textContent = hold.running ? '⏸  Pause' : '▶  Start';
+      if (left === 0 && hold.running) {
+        hold.running = false;
+        hold.accMs = tgt.value * 1000;
+        if (ticker) { clearInterval(ticker); ticker = null; }
+        if (navigator.vibrate) navigator.vibrate(200);
+        commit(tgt.value);   // the next step's own cue follows immediately
+      }
+    };
+    playBtn.onclick = () => {
+      if (hold.running) {
+        hold.accMs = holdElapsedMs();
+        hold.running = false;
+      } else {
+        hold.startedAt = Date.now();
+        hold.running = true;
+      }
+      save();
+      paintHold();
+    };
+    paintHold();
+    ticker = setInterval(paintHold, 250);
   }
 
   function drawRest(step) {
@@ -378,6 +459,20 @@ export function renderRun(root, dayNo) {
     const back = el('button', 'btn', 'Back to the day');
     back.onclick = () => { releaseWakeLock(); location.hash = '#/day/' + dayNo; };
     root.append(back);
+  }
+
+  // Every value the runner logs is a number. iOS shows a keypad for these and
+  // there is no text field anywhere in set entry.
+  function numberInput(stepAttr) {
+    const i = document.createElement('input');
+    i.type = 'number';
+    i.inputMode = 'decimal';
+    i.step = stepAttr;
+    i.min = '0';
+    i.autocomplete = 'off';
+    i.setAttribute('autocorrect', 'off');
+    i.setAttribute('spellcheck', 'false');
+    return i;
   }
 
   function labelled(text, input) {

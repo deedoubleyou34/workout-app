@@ -9,7 +9,9 @@ import { ruleFor, isSessionHit, trailingStreak, evaluate,
          computeFlags, acceptFlag, acceptAll, declineFlag, snoozeFlag, pendingFlags } from '../js/progression.js';
 import { seed } from '../js/seed.js';
 import { nextDayUp, startOver, currentSession, finishSession } from '../js/sessions.js';
-import { buildSteps, remainingSeconds, resumeIndex, progressOf } from '../js/runner.js';
+import { buildSteps, remainingSeconds, resumeIndex, progressOf, stepTarget, isTimedStep,
+         MAIN_REST_FLOOR } from '../js/runner.js';
+import { setText, restText, cueId, spokenSeconds, hasSecondsClip } from '../js/cues.js';
 
 const EX = {
   slRdl:      { id: 1, name: 'Single-leg RDL (DB)', category: 'strength',   load_type: 'dumbbell',   is_timed: 0, increment_value: 5,  increment_unit: 'lb' },
@@ -407,6 +409,69 @@ export async function run(ctx) {
     const i = resumeIndex(steps, (s) => done.has(sig(s)));
     eq('resumes at the first unlogged set, skipping the elapsed rest', sig(steps[i]), 'SL RDL:L2');
     eq('progress counts logged sets only', progressOf(steps, i), { done: 2, total: 4 });
+  }
+
+  // 26. warm-up drills rest 5 s between each, but the break before the first
+  //     working block is a real one (Dom, 2026-08-24)
+  {
+    const steps = buildSteps([
+      blk({ id: 1, code: 'warmup', name: 'Leg swings', rest: 5,
+        targets: [{ side: 'both', sets: 2, reps: 12 }] }),
+      blk({ id: 2, code: 'knee', name: 'ATG split squat', rest: 45,
+        targets: [{ side: 'both', sets: 2, reps: 8 }] }),
+    ]);
+    const rests = steps.filter((s) => s.kind === 'rest');
+    // 5 s inside the warm-up, then the 45 s main rest at the boundary, then
+    // the knee block's own 45 s between its rounds
+    eq('a five-second gap between warm-up drills, 45 s before the work',
+      rests.map((r) => [r.seconds, !!r.main]), [[5, false], [45, true], [45, false]]);
+    eq('only the warm-up carries a main-rest floor', MAIN_REST_FLOOR, { warmup: 45 });
+  }
+
+  // 27. sled work: sets and weight, no counted target (Dom, 2026-08-24)
+  {
+    const steps = buildSteps([blk({ id: 1, code: 'power', name: 'Heavy sled push', rest: 120,
+      targets: [{ side: 'both', sets: 2, reps: null, hold_seconds: null, distance_m: null }] })]);
+    const t = stepTarget(steps[0]);
+    eq('a sled set has no counted target', [t.kind, t.value], ['effort', null]);
+    check('an effort set is never mistaken for a timed one', !isTimedStep(steps[0]));
+  }
+
+  // 28. a hold auto-times itself; a rep set does not — and the two can share a
+  //     block (90/90 hip switches carry both)
+  {
+    const steps = buildSteps([blk({ id: 1, code: 'warmup', name: '90/90 hip switches', rest: 5,
+      targets: [{ side: 'both', sets: 1, reps: 10 }, { side: 'left', sets: 1, hold_seconds: 60 }] })]);
+    const reps = steps.find((s) => s.kind === 'set' && s.target.reps != null);
+    const hold = steps.find((s) => s.kind === 'set' && s.target.hold_seconds != null);
+    check('the rep target on a mixed block does not start a clock', !isTimedStep(reps));
+    check('the hold target on the same block does', isTimedStep(hold));
+    eq('an accepted rep progression moves the target, not the seed',
+      stepTarget(reps, { reps: 14 }).value, 14);
+  }
+
+  // 29. cues are whole sentences, and the ones a progression can reach still
+  //     resolve to something sayable
+  {
+    eq('a set cue is one flowing sentence',
+      setText({ name: 'Copenhagen plank', side: 'left', targetKind: 'hold', targetValue: 60 }),
+      'Copenhagen plank. Left side. One minute.');
+    eq('reps are spoken with their unit attached, not as two clips',
+      setText({ name: 'Reverse Nordic', side: 'both', targetKind: 'reps', targetValue: 15 }),
+      'Reverse Nordic. 15 reps.');
+    eq('a sled set announces the exercise and nothing it cannot count',
+      setText({ name: 'Heavy sled push', side: 'both', targetKind: 'effort', targetValue: null }),
+      'Heavy sled push.');
+    check('a five-second warm-up gap is not announced at all', restText(5) === null);
+    eq('the main rest names what is coming next',
+      restText(90, { main: true, nextCategory: 'Superset A' }),
+      'Main rest. A minute thirty. Next up, Superset A.');
+    eq('long holds are spoken as minutes', [spokenSeconds(120), spokenSeconds(90), spokenSeconds(45)],
+      ['two minutes', 'a minute thirty', '45 seconds']);
+    check('a clip id is derived from what the clip says',
+      cueId('Reverse Nordic. 15 reps.') === 'c_reverse_nordic_15_reps');
+    check('an accepted hold progression (60 -> 70 s) is still speakable', hasSecondsClip(70));
+    check('an off-grid value is not claimed to be speakable', !hasSecondsClip(63));
   }
 
   // 25. rest countdown is wall-clock, so a throttled/backgrounded app catches up

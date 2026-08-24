@@ -4,19 +4,20 @@ Runs on the PC at build time only — nothing Python runs at workout time.
 Output (audio/*.mp3 + audio/manifest.json) is committed to the repo and
 precached by the service worker, so the gym's dead wifi is irrelevant.
 
+    node tools/gen_cues.mjs              # what to say  -> audio/cues.json
     pip install -r tools/requirements.txt
     python tools/gen_audio.py            # only renders what is missing
     python tools/gen_audio.py --force    # re-render everything
+    python tools/gen_audio.py --prune    # delete clips no longer in cues.json
 
-Adding an exercise to seed.js and re-running this is the whole workflow:
-clip ids are derived from exercise names, so new names are picked up
-automatically and existing clips are left alone.
+This script decides nothing about wording. gen_cues.mjs walks every step of
+every day through the real runner and js/cues.js, so the phrasing here is
+exactly the phrasing the app will look for at runtime.
 """
 
 import argparse
 import asyncio
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -24,97 +25,10 @@ import edge_tts
 
 ROOT = Path(__file__).resolve().parent.parent
 AUDIO = ROOT / "audio"
-SEED = ROOT / "js" / "seed.js"
+CUES = AUDIO / "cues.json"
 
 VOICE = "en-US-AndrewNeural"   # clear, level, not breathy; good over gym noise
-RATE = "+8%"                   # slightly brisk — these are cues, not narration
-
-
-def slug(text: str) -> str:
-    s = re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
-    return re.sub(r"_+", "_", s)
-
-
-def exercise_names() -> list[str]:
-    """Pull every exercise name out of seed.js without executing JS.
-
-    Each entry starts a line like:  ['Couch stretch', 'mobility', ...
-    """
-    src = SEED.read_text(encoding="utf-8")
-    block = src.split("export const EXERCISES = [", 1)[1].split("\n];", 1)[0]
-    names = re.findall(r"^\s*\[\s*'((?:[^'\\]|\\.)*)'", block, re.MULTILINE)
-    return [n.replace("\\'", "'") for n in names]
-
-
-def spoken_seconds(n: int) -> str:
-    """Holds run 45-120 s. 'one hundred twenty seconds' is the wrong cue."""
-    if n == 60:
-        return "one minute"
-    if n == 90:
-        return "a minute thirty"
-    if n == 120:
-        return "two minutes"
-    if n % 60 == 0:
-        return f"{n // 60} minutes"
-    return f"{n} seconds"
-
-
-def phrase_library() -> dict[str, str]:
-    """clip id -> text to speak."""
-    clips: dict[str, str] = {}
-
-    def say(text: str) -> str:
-        text = text.replace("90/90", "ninety ninety").replace("Y-T-W", "Y T W")
-        text = text.replace("ATG", "A T G").replace("KB", "kettlebell")
-        text = text.replace("DB", "dumbbell").replace("RDL", "R D L")
-        text = text.replace("QL", "Q L").replace("/", " ")
-        text = re.sub(r"\s+", " ", text)
-        return re.sub(r"\s+,", ",", text).strip(" ,")
-
-    # Cues stay short: the parenthetical equipment note is dropped — unless
-    # dropping it would make two different exercises sound identical
-    # ("Standing calf stretch (knee straight)" vs "(knee bent, soleus)").
-    names = exercise_names()
-    short = {n: say(re.sub(r"\s*\([^)]*\)", "", n)) for n in names}
-    counts: dict[str, int] = {}
-    for s in short.values():
-        counts[s] = counts.get(s, 0) + 1
-    for name in names:
-        if counts[short[name]] > 1:
-            spoken = say(name.replace("(", ", ").replace(")", ""))
-        else:
-            spoken = short[name]
-        clips["ex_" + slug(name)] = spoken
-
-    clips.update({
-        "side_left": "left side",
-        "side_right": "right side",
-        "side_both": "both sides",
-        "u_reps": "reps",
-        "u_seconds": "seconds",
-        "u_pounds": "pounds",
-        "u_sets": "sets",
-        "u_meters": "meters",
-        "u_set": "set",
-        "u_of": "of",
-        "s_next_up": "next up",
-        "s_rest": "rest",
-        "s_ten_seconds": "ten seconds",
-        "s_go": "go",
-        "s_last_set": "last set",
-        "s_session_complete": "session complete",
-        "s_main_rest": "main rest",
-        "s_hold": "hold",
-        "s_four_count": "four count lower",
-        "s_nice": "good",
-    })
-
-    for n in range(1, 51):
-        clips[f"n_{n}"] = str(n)
-    for n in (45, 60, 75, 90, 105, 120):
-        clips[f"sec_{n}"] = spoken_seconds(n)
-
-    return clips
+RATE = "+18%"                  # brisk: Dom found +8% lagged the rest clock
 
 
 async def render(clip_id: str, text: str, force: bool) -> tuple[str, int]:
@@ -178,11 +92,15 @@ def estimate_ms(path: Path) -> int:
 async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--force", action="store_true", help="re-render existing clips")
+    ap.add_argument("--prune", action="store_true", help="delete clips missing from cues.json")
     args = ap.parse_args()
 
+    if not CUES.exists():
+        print("audio/cues.json is missing — run: node tools/gen_cues.mjs", file=sys.stderr)
+        return 1
+    clips: dict[str, str] = json.loads(CUES.read_text(encoding="utf-8"))
     AUDIO.mkdir(exist_ok=True)
-    clips = phrase_library()
-    print(f"{len(clips)} clips ({VOICE})")
+    print(f"{len(clips)} clips ({VOICE} {RATE})")
 
     manifest: dict[str, dict] = {}
     rendered = skipped = 0
@@ -214,6 +132,15 @@ async def main() -> int:
 
     (AUDIO / "manifest.json").write_text(
         json.dumps(dict(sorted(manifest.items())), indent=1), encoding="utf-8")
+
+    stale = sorted(p.stem for p in AUDIO.glob("*.mp3") if p.stem not in clips)
+    if stale:
+        if args.prune:
+            for cid in stale:
+                (AUDIO / f"{cid}.mp3").unlink()
+            print(f"pruned {len(stale)} stale clips")
+        else:
+            print(f"{len(stale)} stale clips (run with --prune): {stale[:6]}")
 
     missing = [c for c in clips if c not in manifest]
     print(f"rendered {rendered}, reused {skipped}, manifest {len(manifest)} clips")

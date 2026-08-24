@@ -22,6 +22,16 @@ export function today() {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
+// Monday of the week a date falls in. The power level is a weekly cycle
+// (Dom, 2026-08-24), so everything that feeds it is filtered from here.
+export function weekStart(iso = today()) {
+  const d = new Date(iso + 'T00:00:00');
+  const back = (d.getDay() + 6) % 7;          // Sunday(0) -> 6 days back
+  d.setDate(d.getDate() - back);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+    + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 export function daysBetween(isoA, isoB) {
   const a = new Date(isoA + 'T00:00:00');
   const b = new Date(isoB + 'T00:00:00');

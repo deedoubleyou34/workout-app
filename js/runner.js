@@ -45,6 +45,12 @@ export function categoryLabel(key) {
   return CATEGORY_LABELS[key] || key;
 }
 
+// Warm-up drills rest 5 s between each (Dom, 2026-08-24), but the break before
+// the first working block is a real one — otherwise the warm-up runs straight
+// into the knee work. Only the warm-up gets a floor; every other category's
+// main rest is exactly what its blocks prescribe.
+export const MAIN_REST_FLOOR = { warmup: 45 };
+
 // Rounds for one superset group / solo block: sets alternate a -> b -> rest.
 function roundsOf(groupBlocks) {
   return Math.max(...groupBlocks.map((b) => Math.max(...b.targets.map((t) => t.sets))));
@@ -108,7 +114,8 @@ export function buildSteps(blocks) {
     steps.push(...inner);
 
     if (!isLastCategory && inner.length) {
-      const mainRest = Math.max(...cat.blocks.map((b) => b.rest_seconds_after || 0), 0);
+      const mainRest = Math.max(
+        ...cat.blocks.map((b) => b.rest_seconds_after || 0), MAIN_REST_FLOOR[cat.key] || 0);
       if (mainRest > 0) {
         steps.push({
           kind: 'rest',
@@ -127,12 +134,24 @@ export function buildSteps(blocks) {
 }
 
 // A step's prescribed work, after any accepted progression (current_load).
+// 'effort' = a set with no countable target: sled pushes and drags, where the
+// prescription is sets + weight and the distance depends on where you are
+// (Dom, 2026-08-24). It is logged as done, never as a rep count of zero.
 export function stepTarget(step, load = {}) {
   const t = step.target;
   if (t.distance_m) return { kind: 'distance', value: t.distance_m, unit: 'm' };
   const timed = step.block.is_timed || t.hold_seconds != null;
   if (timed) return { kind: 'hold', value: load.hold_seconds ?? t.hold_seconds, unit: 's' };
-  return { kind: 'reps', value: load.reps ?? t.reps, unit: 'reps' };
+  const reps = load.reps ?? t.reps;
+  if (reps == null) return { kind: 'effort', value: null, unit: '' };
+  return { kind: 'reps', value: reps, unit: 'reps' };
+}
+
+// Timed work auto-starts a countdown in the runner; everything else waits for
+// the Done press. Derived from stepTarget so the two can never disagree —
+// 90/90 hip switches carry both a rep target and per-side holds on one block.
+export function isTimedStep(step, load = {}) {
+  return step.kind === 'set' && stepTarget(step, load).kind === 'hold';
 }
 
 // Elapsed/remaining from wall-clock deltas. startedAt is epoch ms.

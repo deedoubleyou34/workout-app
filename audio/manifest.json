@@ -1,4 +1,619 @@
 {
+ "c_20_seconds_rest": {
+  "file": "c_20_seconds_rest.mp3",
+  "ms": 1776,
+  "text": "20 seconds rest."
+ },
+ "c_45_seconds_rest": {
+  "file": "c_45_seconds_rest.mp3",
+  "ms": 1776,
+  "text": "45 seconds rest."
+ },
+ "c_90_seconds_rest": {
+  "file": "c_90_seconds_rest.mp3",
+  "ms": 1776,
+  "text": "90 seconds rest."
+ },
+ "c_a_t_g_split_squat_left_side_8_reps": {
+  "file": "c_a_t_g_split_squat_left_side_8_reps.mp3",
+  "ms": 3264,
+  "text": "A T G split squat. Left side. 8 reps."
+ },
+ "c_a_t_g_split_squat_right_side_8_reps": {
+  "file": "c_a_t_g_split_squat_right_side_8_reps.mp3",
+  "ms": 3240,
+  "text": "A T G split squat. Right side. 8 reps."
+ },
+ "c_ab_roller_8_reps": {
+  "file": "c_ab_roller_8_reps.mp3",
+  "ms": 1776,
+  "text": "Ab roller. 8 reps."
+ },
+ "c_ankle_pogo_hops_20_reps": {
+  "file": "c_ankle_pogo_hops_20_reps.mp3",
+  "ms": 2232,
+  "text": "Ankle pogo hops. 20 reps."
+ },
+ "c_arm_circles_and_cross_body_swings_12_reps": {
+  "file": "c_arm_circles_and_cross_body_swings_12_reps.mp3",
+  "ms": 2952,
+  "text": "Arm circles and cross-body swings. 12 reps."
+ },
+ "c_backward_sled_drag": {
+  "file": "c_backward_sled_drag.mp3",
+  "ms": 1776,
+  "text": "Backward sled drag."
+ },
+ "c_band_external_rotation_at_90_degree_abduction_left_side_15_reps": {
+  "file": "c_band_external_rotation_at_90_degree_abduction_left_side_15_reps.mp3",
+  "ms": 4776,
+  "text": "Band external rotation at 90 degree abduction. Left side. 15 reps."
+ },
+ "c_band_external_rotation_at_90_degree_abduction_right_side_15_reps": {
+  "file": "c_band_external_rotation_at_90_degree_abduction_right_side_15_reps.mp3",
+  "ms": 4752,
+  "text": "Band external rotation at 90 degree abduction. Right side. 15 reps."
+ },
+ "c_band_pull_aparts_20_reps": {
+  "file": "c_band_pull_aparts_20_reps.mp3",
+  "ms": 2088,
+  "text": "Band pull-aparts. 20 reps."
+ },
+ "c_band_resisted_lateral_bounds_left_side_10_reps": {
+  "file": "c_band_resisted_lateral_bounds_left_side_10_reps.mp3",
+  "ms": 3480,
+  "text": "Band-resisted lateral bounds. Left side. 10 reps."
+ },
+ "c_band_resisted_lateral_bounds_right_side_10_reps": {
+  "file": "c_band_resisted_lateral_bounds_right_side_10_reps.mp3",
+  "ms": 3456,
+  "text": "Band-resisted lateral bounds. Right side. 10 reps."
+ },
+ "c_band_resisted_monster_walks_20_reps": {
+  "file": "c_band_resisted_monster_walks_20_reps.mp3",
+  "ms": 2664,
+  "text": "Band-resisted monster walks. 20 reps."
+ },
+ "c_banded_ankle_dorsiflexion_rocks_left_side_15_reps": {
+  "file": "c_banded_ankle_dorsiflexion_rocks_left_side_15_reps.mp3",
+  "ms": 4032,
+  "text": "Banded ankle dorsiflexion rocks. Left side. 15 reps."
+ },
+ "c_banded_ankle_dorsiflexion_rocks_right_side_15_reps": {
+  "file": "c_banded_ankle_dorsiflexion_rocks_right_side_15_reps.mp3",
+  "ms": 4008,
+  "text": "Banded ankle dorsiflexion rocks. Right side. 15 reps."
+ },
+ "c_banded_clamshells_left_side_15_reps": {
+  "file": "c_banded_clamshells_left_side_15_reps.mp3",
+  "ms": 3096,
+  "text": "Banded clamshells. Left side. 15 reps."
+ },
+ "c_banded_clamshells_right_side_15_reps": {
+  "file": "c_banded_clamshells_right_side_15_reps.mp3",
+  "ms": 3072,
+  "text": "Banded clamshells. Right side. 15 reps."
+ },
+ "c_banded_hip_flexor_march_left_side_12_reps": {
+  "file": "c_banded_hip_flexor_march_left_side_12_reps.mp3",
+  "ms": 3264,
+  "text": "Banded hip flexor march. Left side. 12 reps."
+ },
+ "c_banded_hip_flexor_march_left_side_15_reps": {
+  "file": "c_banded_hip_flexor_march_left_side_15_reps.mp3",
+  "ms": 3384,
+  "text": "Banded hip flexor march. Left side. 15 reps."
+ },
+ "c_banded_hip_flexor_march_right_side_12_reps": {
+  "file": "c_banded_hip_flexor_march_right_side_12_reps.mp3",
+  "ms": 3240,
+  "text": "Banded hip flexor march. Right side. 12 reps."
+ },
+ "c_banded_hip_flexor_march_right_side_15_reps": {
+  "file": "c_banded_hip_flexor_march_right_side_15_reps.mp3",
+  "ms": 3360,
+  "text": "Banded hip flexor march. Right side. 15 reps."
+ },
+ "c_banded_leg_curl_left_side_15_reps": {
+  "file": "c_banded_leg_curl_left_side_15_reps.mp3",
+  "ms": 3024,
+  "text": "Banded leg curl. Left side. 15 reps."
+ },
+ "c_banded_leg_curl_right_side_15_reps": {
+  "file": "c_banded_leg_curl_right_side_15_reps.mp3",
+  "ms": 3000,
+  "text": "Banded leg curl. Right side. 15 reps."
+ },
+ "c_barbell_hip_thrust_8_reps": {
+  "file": "c_barbell_hip_thrust_8_reps.mp3",
+  "ms": 2136,
+  "text": "Barbell hip thrust. 8 reps."
+ },
+ "c_broad_jump_hold_and_stick_6_reps": {
+  "file": "c_broad_jump_hold_and_stick_6_reps.mp3",
+  "ms": 2304,
+  "text": "Broad jump hold-and-stick. 6 reps."
+ },
+ "c_copenhagen_plank_left_side_one_minute": {
+  "file": "c_copenhagen_plank_left_side_one_minute.mp3",
+  "ms": 2856,
+  "text": "Copenhagen plank. Left side. One minute."
+ },
+ "c_copenhagen_plank_right_side_45_seconds": {
+  "file": "c_copenhagen_plank_right_side_45_seconds.mp3",
+  "ms": 3384,
+  "text": "Copenhagen plank. Right side. 45 seconds."
+ },
+ "c_couch_stretch_left_side_two_minutes": {
+  "file": "c_couch_stretch_left_side_two_minutes.mp3",
+  "ms": 2736,
+  "text": "Couch stretch. Left side. Two minutes."
+ },
+ "c_couch_stretch_right_side_one_minute": {
+  "file": "c_couch_stretch_right_side_one_minute.mp3",
+  "ms": 2640,
+  "text": "Couch stretch. Right side. One minute."
+ },
+ "c_dead_bug_left_side_8_reps": {
+  "file": "c_dead_bug_left_side_8_reps.mp3",
+  "ms": 2520,
+  "text": "Dead bug. Left side. 8 reps."
+ },
+ "c_dead_bug_right_side_8_reps": {
+  "file": "c_dead_bug_right_side_8_reps.mp3",
+  "ms": 2496,
+  "text": "Dead bug. Right side. 8 reps."
+ },
+ "c_depth_drop_into_stick_landing_4_reps": {
+  "file": "c_depth_drop_into_stick_landing_4_reps.mp3",
+  "ms": 2544,
+  "text": "Depth drop into stick landing. 4 reps."
+ },
+ "c_depth_march_6_reps": {
+  "file": "c_depth_march_6_reps.mp3",
+  "ms": 1824,
+  "text": "Depth march. 6 reps."
+ },
+ "c_doorway_pec_stretch_left_side_a_minute_thirty": {
+  "file": "c_doorway_pec_stretch_left_side_a_minute_thirty.mp3",
+  "ms": 3144,
+  "text": "Doorway pec stretch. Left side. A minute thirty."
+ },
+ "c_doorway_pec_stretch_right_side_a_minute_thirty": {
+  "file": "c_doorway_pec_stretch_right_side_a_minute_thirty.mp3",
+  "ms": 3120,
+  "text": "Doorway pec stretch. Right side. A minute thirty."
+ },
+ "c_dumbbell_scaption_raise_12_reps": {
+  "file": "c_dumbbell_scaption_raise_12_reps.mp3",
+  "ms": 2328,
+  "text": "Dumbbell scaption raise. 12 reps."
+ },
+ "c_face_pulls_15_reps": {
+  "file": "c_face_pulls_15_reps.mp3",
+  "ms": 2016,
+  "text": "Face pulls. 15 reps."
+ },
+ "c_fire_hydrant_left_side_12_reps": {
+  "file": "c_fire_hydrant_left_side_12_reps.mp3",
+  "ms": 2832,
+  "text": "Fire hydrant. Left side. 12 reps."
+ },
+ "c_fire_hydrant_right_side_12_reps": {
+  "file": "c_fire_hydrant_right_side_12_reps.mp3",
+  "ms": 2832,
+  "text": "Fire hydrant. Right side. 12 reps."
+ },
+ "c_glute_bridge_iso_hold_45_seconds": {
+  "file": "c_glute_bridge_iso_hold_45_seconds.mp3",
+  "ms": 3024,
+  "text": "Glute bridge iso hold. 45 seconds."
+ },
+ "c_glute_bridge_iso_hold_one_minute": {
+  "file": "c_glute_bridge_iso_hold_one_minute.mp3",
+  "ms": 2472,
+  "text": "Glute bridge iso hold. One minute."
+ },
+ "c_half_kneeling_single_arm_band_row_left_side_12_reps": {
+  "file": "c_half_kneeling_single_arm_band_row_left_side_12_reps.mp3",
+  "ms": 3552,
+  "text": "Half-kneeling single-arm band row. Left side. 12 reps."
+ },
+ "c_half_kneeling_single_arm_band_row_right_side_12_reps": {
+  "file": "c_half_kneeling_single_arm_band_row_right_side_12_reps.mp3",
+  "ms": 3528,
+  "text": "Half-kneeling single-arm band row. Right side. 12 reps."
+ },
+ "c_heavy_sled_march": {
+  "file": "c_heavy_sled_march.mp3",
+  "ms": 1776,
+  "text": "Heavy sled march."
+ },
+ "c_heavy_sled_push": {
+  "file": "c_heavy_sled_push.mp3",
+  "ms": 1776,
+  "text": "Heavy sled push."
+ },
+ "c_kettlebell_swings_15_reps": {
+  "file": "c_kettlebell_swings_15_reps.mp3",
+  "ms": 2232,
+  "text": "Kettlebell swings. 15 reps."
+ },
+ "c_landmine_press_left_side_8_reps": {
+  "file": "c_landmine_press_left_side_8_reps.mp3",
+  "ms": 2808,
+  "text": "Landmine press. Left side. 8 reps."
+ },
+ "c_landmine_press_right_side_8_reps": {
+  "file": "c_landmine_press_right_side_8_reps.mp3",
+  "ms": 2784,
+  "text": "Landmine press. Right side. 8 reps."
+ },
+ "c_lateral_band_walks_20_reps": {
+  "file": "c_lateral_band_walks_20_reps.mp3",
+  "ms": 2208,
+  "text": "Lateral band walks. 20 reps."
+ },
+ "c_leg_swings_left_side_12_reps": {
+  "file": "c_leg_swings_left_side_12_reps.mp3",
+  "ms": 2856,
+  "text": "Leg swings. Left side. 12 reps."
+ },
+ "c_leg_swings_right_side_12_reps": {
+  "file": "c_leg_swings_right_side_12_reps.mp3",
+  "ms": 2832,
+  "text": "Leg swings. Right side. 12 reps."
+ },
+ "c_main_rest_45_seconds_next_up_knee_and_tendon": {
+  "file": "c_main_rest_45_seconds_next_up_knee_and_tendon.mp3",
+  "ms": 3984,
+  "text": "Main rest. 45 seconds. Next up, Knee and tendon."
+ },
+ "c_main_rest_45_seconds_next_up_superset_a": {
+  "file": "c_main_rest_45_seconds_next_up_superset_a.mp3",
+  "ms": 3672,
+  "text": "Main rest. 45 seconds. Next up, Superset A."
+ },
+ "c_main_rest_a_minute_thirty_next_up_finisher": {
+  "file": "c_main_rest_a_minute_thirty_next_up_finisher.mp3",
+  "ms": 3168,
+  "text": "Main rest. A minute thirty. Next up, Finisher."
+ },
+ "c_main_rest_a_minute_thirty_next_up_superset_b": {
+  "file": "c_main_rest_a_minute_thirty_next_up_superset_b.mp3",
+  "ms": 3408,
+  "text": "Main rest. A minute thirty. Next up, Superset B."
+ },
+ "c_main_rest_a_minute_thirty_next_up_superset_c": {
+  "file": "c_main_rest_a_minute_thirty_next_up_superset_c.mp3",
+  "ms": 3432,
+  "text": "Main rest. A minute thirty. Next up, Superset C."
+ },
+ "c_main_rest_one_minute_next_up_core_and_pelvis": {
+  "file": "c_main_rest_one_minute_next_up_core_and_pelvis.mp3",
+  "ms": 3432,
+  "text": "Main rest. One minute. Next up, Core and pelvis."
+ },
+ "c_main_rest_one_minute_next_up_finisher": {
+  "file": "c_main_rest_one_minute_next_up_finisher.mp3",
+  "ms": 2952,
+  "text": "Main rest. One minute. Next up, Finisher."
+ },
+ "c_main_rest_one_minute_next_up_power": {
+  "file": "c_main_rest_one_minute_next_up_power.mp3",
+  "ms": 2856,
+  "text": "Main rest. One minute. Next up, Power."
+ },
+ "c_main_rest_one_minute_next_up_superset_a": {
+  "file": "c_main_rest_one_minute_next_up_superset_a.mp3",
+  "ms": 3120,
+  "text": "Main rest. One minute. Next up, Superset A."
+ },
+ "c_main_rest_one_minute_next_up_superset_b": {
+  "file": "c_main_rest_one_minute_next_up_superset_b.mp3",
+  "ms": 3192,
+  "text": "Main rest. One minute. Next up, Superset B."
+ },
+ "c_main_rest_one_minute_next_up_superset_c": {
+  "file": "c_main_rest_one_minute_next_up_superset_c.mp3",
+  "ms": 3216,
+  "text": "Main rest. One minute. Next up, Superset C."
+ },
+ "c_main_rest_two_minutes_next_up_finisher": {
+  "file": "c_main_rest_two_minutes_next_up_finisher.mp3",
+  "ms": 3048,
+  "text": "Main rest. Two minutes. Next up, Finisher."
+ },
+ "c_ninety_ninety_hip_switches_10_reps": {
+  "file": "c_ninety_ninety_hip_switches_10_reps.mp3",
+  "ms": 2400,
+  "text": "Ninety ninety hip switches. 10 reps."
+ },
+ "c_ninety_ninety_hip_switches_8_reps": {
+  "file": "c_ninety_ninety_hip_switches_8_reps.mp3",
+  "ms": 2424,
+  "text": "Ninety ninety hip switches. 8 reps."
+ },
+ "c_ninety_ninety_hip_switches_left_side_45_seconds": {
+  "file": "c_ninety_ninety_hip_switches_left_side_45_seconds.mp3",
+  "ms": 3720,
+  "text": "Ninety ninety hip switches. Left side. 45 seconds."
+ },
+ "c_ninety_ninety_hip_switches_left_side_one_minute": {
+  "file": "c_ninety_ninety_hip_switches_left_side_one_minute.mp3",
+  "ms": 3168,
+  "text": "Ninety ninety hip switches. Left side. One minute."
+ },
+ "c_ninety_ninety_hip_switches_right_side_45_seconds": {
+  "file": "c_ninety_ninety_hip_switches_right_side_45_seconds.mp3",
+  "ms": 3696,
+  "text": "Ninety ninety hip switches. Right side. 45 seconds."
+ },
+ "c_ninety_ninety_hip_switches_right_side_one_minute": {
+  "file": "c_ninety_ninety_hip_switches_right_side_one_minute.mp3",
+  "ms": 3144,
+  "text": "Ninety ninety hip switches. Right side. One minute."
+ },
+ "c_nordic_hamstring_curl_5_reps": {
+  "file": "c_nordic_hamstring_curl_5_reps.mp3",
+  "ms": 2232,
+  "text": "Nordic hamstring curl. 5 reps."
+ },
+ "c_one_minute_rest": {
+  "file": "c_one_minute_rest.mp3",
+  "ms": 1776,
+  "text": "One minute rest."
+ },
+ "c_pallof_press_iso_hold_left_side_one_minute": {
+  "file": "c_pallof_press_iso_hold_left_side_one_minute.mp3",
+  "ms": 3336,
+  "text": "Pallof press iso hold. Left side. One minute."
+ },
+ "c_pallof_press_iso_hold_right_side_one_minute": {
+  "file": "c_pallof_press_iso_hold_right_side_one_minute.mp3",
+  "ms": 3312,
+  "text": "Pallof press iso hold. Right side. One minute."
+ },
+ "c_pallof_press_left_side_12_reps": {
+  "file": "c_pallof_press_left_side_12_reps.mp3",
+  "ms": 2832,
+  "text": "Pallof press. Left side. 12 reps."
+ },
+ "c_pallof_press_right_side_12_reps": {
+  "file": "c_pallof_press_right_side_12_reps.mp3",
+  "ms": 2808,
+  "text": "Pallof press. Right side. 12 reps."
+ },
+ "c_prone_trap_raise_12_reps": {
+  "file": "c_prone_trap_raise_12_reps.mp3",
+  "ms": 2040,
+  "text": "Prone trap raise. 12 reps."
+ },
+ "c_prone_y_t_w_10_reps": {
+  "file": "c_prone_y_t_w_10_reps.mp3",
+  "ms": 2232,
+  "text": "Prone Y T W. 10 reps."
+ },
+ "c_reverse_nordic_8_reps": {
+  "file": "c_reverse_nordic_8_reps.mp3",
+  "ms": 1968,
+  "text": "Reverse Nordic. 8 reps."
+ },
+ "c_serratus_punch_left_side_12_reps": {
+  "file": "c_serratus_punch_left_side_12_reps.mp3",
+  "ms": 2880,
+  "text": "Serratus punch. Left side. 12 reps."
+ },
+ "c_serratus_punch_right_side_12_reps": {
+  "file": "c_serratus_punch_right_side_12_reps.mp3",
+  "ms": 2856,
+  "text": "Serratus punch. Right side. 12 reps."
+ },
+ "c_side_lying_hip_abduction_left_side_15_reps": {
+  "file": "c_side_lying_hip_abduction_left_side_15_reps.mp3",
+  "ms": 3312,
+  "text": "Side-lying hip abduction. Left side. 15 reps."
+ },
+ "c_side_lying_hip_abduction_right_side_15_reps": {
+  "file": "c_side_lying_hip_abduction_right_side_15_reps.mp3",
+  "ms": 3288,
+  "text": "Side-lying hip abduction. Right side. 15 reps."
+ },
+ "c_side_plank_hip_dips_left_side_8_reps": {
+  "file": "c_side_plank_hip_dips_left_side_8_reps.mp3",
+  "ms": 3000,
+  "text": "Side plank hip dips. Left side. 8 reps."
+ },
+ "c_side_plank_hip_dips_right_side_8_reps": {
+  "file": "c_side_plank_hip_dips_right_side_8_reps.mp3",
+  "ms": 2976,
+  "text": "Side plank hip dips. Right side. 8 reps."
+ },
+ "c_side_plank_hold_left_side_45_seconds": {
+  "file": "c_side_plank_hold_left_side_45_seconds.mp3",
+  "ms": 3264,
+  "text": "Side plank hold. Left side. 45 seconds."
+ },
+ "c_side_plank_hold_right_side_one_minute": {
+  "file": "c_side_plank_hold_right_side_one_minute.mp3",
+  "ms": 2688,
+  "text": "Side plank hold. Right side. One minute."
+ },
+ "c_side_plank_with_abduction_left_side_10_reps": {
+  "file": "c_side_plank_with_abduction_left_side_10_reps.mp3",
+  "ms": 3144,
+  "text": "Side plank with abduction. Left side. 10 reps."
+ },
+ "c_side_plank_with_abduction_right_side_10_reps": {
+  "file": "c_side_plank_with_abduction_right_side_10_reps.mp3",
+  "ms": 3120,
+  "text": "Side plank with abduction. Right side. 10 reps."
+ },
+ "c_single_leg_ankle_pogo_hops_left_side_15_reps": {
+  "file": "c_single_leg_ankle_pogo_hops_left_side_15_reps.mp3",
+  "ms": 3816,
+  "text": "Single-leg ankle pogo hops. Left side. 15 reps."
+ },
+ "c_single_leg_ankle_pogo_hops_right_side_15_reps": {
+  "file": "c_single_leg_ankle_pogo_hops_right_side_15_reps.mp3",
+  "ms": 3792,
+  "text": "Single-leg ankle pogo hops. Right side. 15 reps."
+ },
+ "c_single_leg_box_step_up_left_side_8_reps": {
+  "file": "c_single_leg_box_step_up_left_side_8_reps.mp3",
+  "ms": 3168,
+  "text": "Single-leg box step-up. Left side. 8 reps."
+ },
+ "c_single_leg_box_step_up_right_side_8_reps": {
+  "file": "c_single_leg_box_step_up_right_side_8_reps.mp3",
+  "ms": 3144,
+  "text": "Single-leg box step-up. Right side. 8 reps."
+ },
+ "c_single_leg_glute_bridge_left_side_8_reps": {
+  "file": "c_single_leg_glute_bridge_left_side_8_reps.mp3",
+  "ms": 3216,
+  "text": "Single-leg glute bridge. Left side. 8 reps."
+ },
+ "c_single_leg_glute_bridge_right_side_12_reps": {
+  "file": "c_single_leg_glute_bridge_right_side_12_reps.mp3",
+  "ms": 3264,
+  "text": "Single-leg glute bridge. Right side. 12 reps."
+ },
+ "c_single_leg_glute_bridge_right_side_8_reps": {
+  "file": "c_single_leg_glute_bridge_right_side_8_reps.mp3",
+  "ms": 3192,
+  "text": "Single-leg glute bridge. Right side. 8 reps."
+ },
+ "c_single_leg_r_d_l_dumbbell_left_side_8_reps": {
+  "file": "c_single_leg_r_d_l_dumbbell_left_side_8_reps.mp3",
+  "ms": 3936,
+  "text": "Single-leg R D L, dumbbell. Left side. 8 reps."
+ },
+ "c_single_leg_r_d_l_dumbbell_right_side_8_reps": {
+  "file": "c_single_leg_r_d_l_dumbbell_right_side_8_reps.mp3",
+  "ms": 3912,
+  "text": "Single-leg R D L, dumbbell. Right side. 8 reps."
+ },
+ "c_single_leg_r_d_l_kettlebell_left_side_10_reps": {
+  "file": "c_single_leg_r_d_l_kettlebell_left_side_10_reps.mp3",
+  "ms": 3960,
+  "text": "Single-leg R D L, kettlebell. Left side. 10 reps."
+ },
+ "c_single_leg_r_d_l_kettlebell_right_side_10_reps": {
+  "file": "c_single_leg_r_d_l_kettlebell_right_side_10_reps.mp3",
+  "ms": 3936,
+  "text": "Single-leg R D L, kettlebell. Right side. 10 reps."
+ },
+ "c_slow_calf_raises_off_low_board_15_reps": {
+  "file": "c_slow_calf_raises_off_low_board_15_reps.mp3",
+  "ms": 2904,
+  "text": "Slow calf raises off low board. 15 reps."
+ },
+ "c_standing_banded_hip_abduction_hold_left_side_45_seconds": {
+  "file": "c_standing_banded_hip_abduction_hold_left_side_45_seconds.mp3",
+  "ms": 4128,
+  "text": "Standing banded hip abduction hold. Left side. 45 seconds."
+ },
+ "c_standing_banded_hip_abduction_hold_right_side_one_minute": {
+  "file": "c_standing_banded_hip_abduction_hold_right_side_one_minute.mp3",
+  "ms": 3576,
+  "text": "Standing banded hip abduction hold. Right side. One minute."
+ },
+ "c_standing_banded_hip_flexion_left_side_12_reps": {
+  "file": "c_standing_banded_hip_flexion_left_side_12_reps.mp3",
+  "ms": 3456,
+  "text": "Standing banded hip flexion. Left side. 12 reps."
+ },
+ "c_standing_banded_hip_flexion_right_side_12_reps": {
+  "file": "c_standing_banded_hip_flexion_right_side_12_reps.mp3",
+  "ms": 3432,
+  "text": "Standing banded hip flexion. Right side. 12 reps."
+ },
+ "c_standing_calf_raise_iso_hold_45_seconds": {
+  "file": "c_standing_calf_raise_iso_hold_45_seconds.mp3",
+  "ms": 3456,
+  "text": "Standing calf raise iso hold. 45 seconds."
+ },
+ "c_standing_calf_stretch_knee_bent_soleus_left_side_a_minute_thirty": {
+  "file": "c_standing_calf_stretch_knee_bent_soleus_left_side_a_minute_thirty.mp3",
+  "ms": 4704,
+  "text": "Standing calf stretch, knee bent, soleus. Left side. A minute thirty."
+ },
+ "c_standing_calf_stretch_knee_bent_soleus_right_side_one_minute": {
+  "file": "c_standing_calf_stretch_knee_bent_soleus_right_side_one_minute.mp3",
+  "ms": 4464,
+  "text": "Standing calf stretch, knee bent, soleus. Right side. One minute."
+ },
+ "c_standing_calf_stretch_knee_straight_left_side_a_minute_thirty": {
+  "file": "c_standing_calf_stretch_knee_straight_left_side_a_minute_thirty.mp3",
+  "ms": 4008,
+  "text": "Standing calf stretch, knee straight. Left side. A minute thirty."
+ },
+ "c_standing_calf_stretch_knee_straight_right_side_one_minute": {
+  "file": "c_standing_calf_stretch_knee_straight_right_side_one_minute.mp3",
+  "ms": 3792,
+  "text": "Standing calf stretch, knee straight. Right side. One minute."
+ },
+ "c_suitcase_carry_left_side_30_meters": {
+  "file": "c_suitcase_carry_left_side_30_meters.mp3",
+  "ms": 2952,
+  "text": "Suitcase carry. Left side. 30 meters."
+ },
+ "c_suitcase_carry_right_side_30_meters": {
+  "file": "c_suitcase_carry_right_side_30_meters.mp3",
+  "ms": 2928,
+  "text": "Suitcase carry. Right side. 30 meters."
+ },
+ "c_tibialis_raise_20_reps": {
+  "file": "c_tibialis_raise_20_reps.mp3",
+  "ms": 2136,
+  "text": "Tibialis raise. 20 reps."
+ },
+ "c_tibialis_raise_25_reps": {
+  "file": "c_tibialis_raise_25_reps.mp3",
+  "ms": 2376,
+  "text": "Tibialis raise. 25 reps."
+ },
+ "c_tibialis_raise_loaded_20_reps": {
+  "file": "c_tibialis_raise_loaded_20_reps.mp3",
+  "ms": 2592,
+  "text": "Tibialis raise, loaded. 20 reps."
+ },
+ "c_trap_bar_deadlift_jump_shrug_4_reps": {
+  "file": "c_trap_bar_deadlift_jump_shrug_4_reps.mp3",
+  "ms": 2640,
+  "text": "Trap bar deadlift jump-shrug. 4 reps."
+ },
+ "c_two_minutes_rest": {
+  "file": "c_two_minutes_rest.mp3",
+  "ms": 1776,
+  "text": "Two minutes rest."
+ },
+ "c_wall_sit_iso_hold_a_minute_thirty": {
+  "file": "c_wall_sit_iso_hold_a_minute_thirty.mp3",
+  "ms": 2496,
+  "text": "Wall sit iso hold. A minute thirty."
+ },
+ "c_wall_slides_with_scapular_protraction_12_reps": {
+  "file": "c_wall_slides_with_scapular_protraction_12_reps.mp3",
+  "ms": 3072,
+  "text": "Wall slides with scapular protraction. 12 reps."
+ },
+ "c_weighted_hanging_knee_raise_10_reps": {
+  "file": "c_weighted_hanging_knee_raise_10_reps.mp3",
+  "ms": 2328,
+  "text": "Weighted hanging knee raise. 10 reps."
+ },
+ "c_weighted_hip_flexor_march_left_side_10_reps": {
+  "file": "c_weighted_hip_flexor_march_left_side_10_reps.mp3",
+  "ms": 3192,
+  "text": "Weighted hip flexor march. Left side. 10 reps."
+ },
+ "c_weighted_hip_flexor_march_right_side_10_reps": {
+  "file": "c_weighted_hip_flexor_march_right_side_10_reps.mp3",
+  "ms": 3168,
+  "text": "Weighted hip flexor march. Right side. 10 reps."
+ },
  "ex_90_90_hip_switches": {
   "file": "ex_90_90_hip_switches.mp3",
   "ms": 1776,
@@ -16,8 +631,8 @@
  },
  "ex_arm_circles_cross_body_swings": {
   "file": "ex_arm_circles_cross_body_swings.mp3",
-  "ms": 2568,
-  "text": "Arm circles + cross-body swings"
+  "ms": 2088,
+  "text": "Arm circles and cross-body swings"
  },
  "ex_atg_split_squat_front_foot_on_low_board": {
   "file": "ex_atg_split_squat_front_foot_on_low_board.mp3",
@@ -31,8 +646,8 @@
  },
  "ex_band_external_rotation_at_90_abduction": {
   "file": "ex_band_external_rotation_at_90_abduction.mp3",
-  "ms": 3336,
-  "text": "Band external rotation at 90\u00b0 abduction"
+  "ms": 3048,
+  "text": "Band external rotation at 90 degree abduction"
  },
  "ex_band_pull_aparts": {
   "file": "ex_band_pull_aparts.mp3",
@@ -41,17 +656,17 @@
  },
  "ex_band_resisted_lateral_bounds": {
   "file": "ex_band_resisted_lateral_bounds.mp3",
-  "ms": 1920,
+  "ms": 1776,
   "text": "Band-resisted lateral bounds"
  },
  "ex_band_resisted_monster_walks": {
   "file": "ex_band_resisted_monster_walks.mp3",
-  "ms": 1920,
+  "ms": 1776,
   "text": "Band-resisted monster walks"
  },
  "ex_banded_ankle_dorsiflexion_rocks": {
   "file": "ex_banded_ankle_dorsiflexion_rocks.mp3",
-  "ms": 2352,
+  "ms": 2136,
   "text": "Banded ankle dorsiflexion rocks"
  },
  "ex_banded_clamshells": {
@@ -101,7 +716,7 @@
  },
  "ex_depth_drop_into_stick_landing": {
   "file": "ex_depth_drop_into_stick_landing.mp3",
-  "ms": 1848,
+  "ms": 1776,
   "text": "Depth drop into stick landing"
  },
  "ex_depth_march_low_board": {
@@ -126,12 +741,12 @@
  },
  "ex_glute_bridge_iso_hold": {
   "file": "ex_glute_bridge_iso_hold.mp3",
-  "ms": 1872,
+  "ms": 1776,
   "text": "Glute bridge iso hold"
  },
  "ex_half_kneeling_single_arm_band_row": {
   "file": "ex_half_kneeling_single_arm_band_row.mp3",
-  "ms": 1992,
+  "ms": 1824,
   "text": "Half-kneeling single-arm band row"
  },
  "ex_heavy_sled_march": {
@@ -176,7 +791,7 @@
  },
  "ex_pallof_press_iso_hold": {
   "file": "ex_pallof_press_iso_hold.mp3",
-  "ms": 1968,
+  "ms": 1800,
   "text": "Pallof press iso hold"
  },
  "ex_prone_trap_raise": {
@@ -221,7 +836,7 @@
  },
  "ex_single_leg_ankle_pogo_hops": {
   "file": "ex_single_leg_ankle_pogo_hops.mp3",
-  "ms": 2088,
+  "ms": 1920,
   "text": "Single-leg ankle pogo hops"
  },
  "ex_single_leg_box_step_up": {
@@ -236,42 +851,42 @@
  },
  "ex_single_leg_rdl_db": {
   "file": "ex_single_leg_rdl_db.mp3",
-  "ms": 2424,
+  "ms": 2232,
   "text": "Single-leg R D L, dumbbell"
  },
  "ex_single_leg_rdl_kb": {
   "file": "ex_single_leg_rdl_kb.mp3",
-  "ms": 2472,
+  "ms": 2256,
   "text": "Single-leg R D L, kettlebell"
  },
  "ex_slow_calf_raises_off_low_board": {
   "file": "ex_slow_calf_raises_off_low_board.mp3",
-  "ms": 2040,
+  "ms": 1872,
   "text": "Slow calf raises off low board"
  },
  "ex_standing_banded_hip_abduction_hold": {
   "file": "ex_standing_banded_hip_abduction_hold.mp3",
-  "ms": 2328,
+  "ms": 2136,
   "text": "Standing banded hip abduction hold"
  },
  "ex_standing_banded_hip_flexion": {
   "file": "ex_standing_banded_hip_flexion.mp3",
-  "ms": 1872,
+  "ms": 1776,
   "text": "Standing banded hip flexion"
  },
  "ex_standing_calf_raise_iso_hold_top": {
   "file": "ex_standing_calf_raise_iso_hold_top.mp3",
-  "ms": 2376,
+  "ms": 2184,
   "text": "Standing calf raise iso hold"
  },
  "ex_standing_calf_stretch_knee_bent_soleus": {
   "file": "ex_standing_calf_stretch_knee_bent_soleus.mp3",
-  "ms": 3192,
+  "ms": 2928,
   "text": "Standing calf stretch, knee bent, soleus"
  },
  "ex_standing_calf_stretch_knee_straight": {
   "file": "ex_standing_calf_stretch_knee_straight.mp3",
-  "ms": 2400,
+  "ms": 2208,
   "text": "Standing calf stretch, knee straight"
  },
  "ex_suitcase_carry": {
@@ -286,12 +901,12 @@
  },
  "ex_tibialis_raise_loaded": {
   "file": "ex_tibialis_raise_loaded.mp3",
-  "ms": 1800,
+  "ms": 1776,
   "text": "Tibialis raise, loaded"
  },
  "ex_trap_bar_deadlift_jump_shrug": {
   "file": "ex_trap_bar_deadlift_jump_shrug.mp3",
-  "ms": 1992,
+  "ms": 1824,
   "text": "Trap bar deadlift jump-shrug"
  },
  "ex_wall_sit_iso_hold": {
@@ -301,7 +916,7 @@
  },
  "ex_wall_slides_with_scapular_protraction": {
   "file": "ex_wall_slides_with_scapular_protraction.mp3",
-  "ms": 2328,
+  "ms": 2112,
   "text": "Wall slides with scapular protraction"
  },
  "ex_weighted_hanging_knee_raise": {
@@ -316,22 +931,22 @@
  },
  "n_1": {
   "file": "n_1.mp3",
-  "ms": 696,
+  "ms": 648,
   "text": "1"
  },
  "n_10": {
   "file": "n_10.mp3",
-  "ms": 696,
+  "ms": 624,
   "text": "10"
  },
  "n_11": {
   "file": "n_11.mp3",
-  "ms": 1776,
+  "ms": 720,
   "text": "11"
  },
  "n_12": {
   "file": "n_12.mp3",
-  "ms": 1776,
+  "ms": 696,
   "text": "12"
  },
  "n_13": {
@@ -371,12 +986,12 @@
  },
  "n_2": {
   "file": "n_2.mp3",
-  "ms": 648,
+  "ms": 600,
   "text": "2"
  },
  "n_20": {
   "file": "n_20.mp3",
-  "ms": 720,
+  "ms": 672,
   "text": "20"
  },
  "n_21": {
@@ -426,12 +1041,12 @@
  },
  "n_3": {
   "file": "n_3.mp3",
-  "ms": 696,
+  "ms": 648,
   "text": "3"
  },
  "n_30": {
   "file": "n_30.mp3",
-  "ms": 720,
+  "ms": 672,
   "text": "30"
  },
  "n_31": {
@@ -481,12 +1096,12 @@
  },
  "n_4": {
   "file": "n_4.mp3",
-  "ms": 744,
+  "ms": 696,
   "text": "4"
  },
  "n_40": {
   "file": "n_40.mp3",
-  "ms": 744,
+  "ms": 696,
   "text": "40"
  },
  "n_41": {
@@ -536,48 +1151,38 @@
  },
  "n_5": {
   "file": "n_5.mp3",
-  "ms": 1776,
+  "ms": 720,
   "text": "5"
  },
  "n_50": {
   "file": "n_50.mp3",
-  "ms": 1776,
+  "ms": 744,
   "text": "50"
  },
  "n_6": {
   "file": "n_6.mp3",
-  "ms": 1776,
+  "ms": 768,
   "text": "6"
  },
  "n_7": {
   "file": "n_7.mp3",
-  "ms": 744,
+  "ms": 696,
   "text": "7"
  },
  "n_8": {
   "file": "n_8.mp3",
-  "ms": 648,
+  "ms": 600,
   "text": "8"
  },
  "n_9": {
   "file": "n_9.mp3",
-  "ms": 720,
+  "ms": 672,
   "text": "9"
- },
- "s_four_count": {
-  "file": "s_four_count.mp3",
-  "ms": 1776,
-  "text": "four count lower"
  },
  "s_go": {
   "file": "s_go.mp3",
-  "ms": 648,
+  "ms": 600,
   "text": "go"
- },
- "s_hold": {
-  "file": "s_hold.mp3",
-  "ms": 720,
-  "text": "hold"
  },
  "s_last_set": {
   "file": "s_last_set.mp3",
@@ -591,13 +1196,8 @@
  },
  "s_next_up": {
   "file": "s_next_up.mp3",
-  "ms": 1776,
+  "ms": 744,
   "text": "next up"
- },
- "s_nice": {
-  "file": "s_nice.mp3",
-  "ms": 648,
-  "text": "good"
  },
  "s_rest": {
   "file": "s_rest.mp3",
@@ -614,35 +1214,185 @@
   "ms": 1776,
   "text": "ten seconds"
  },
+ "sec_10": {
+  "file": "sec_10.mp3",
+  "ms": 1776,
+  "text": "10 seconds"
+ },
+ "sec_100": {
+  "file": "sec_100.mp3",
+  "ms": 1776,
+  "text": "100 seconds"
+ },
  "sec_105": {
   "file": "sec_105.mp3",
   "ms": 1776,
   "text": "105 seconds"
+ },
+ "sec_110": {
+  "file": "sec_110.mp3",
+  "ms": 1776,
+  "text": "110 seconds"
+ },
+ "sec_115": {
+  "file": "sec_115.mp3",
+  "ms": 1776,
+  "text": "115 seconds"
  },
  "sec_120": {
   "file": "sec_120.mp3",
   "ms": 1776,
   "text": "two minutes"
  },
+ "sec_125": {
+  "file": "sec_125.mp3",
+  "ms": 1776,
+  "text": "125 seconds"
+ },
+ "sec_130": {
+  "file": "sec_130.mp3",
+  "ms": 1776,
+  "text": "130 seconds"
+ },
+ "sec_135": {
+  "file": "sec_135.mp3",
+  "ms": 1944,
+  "text": "135 seconds"
+ },
+ "sec_140": {
+  "file": "sec_140.mp3",
+  "ms": 1776,
+  "text": "140 seconds"
+ },
+ "sec_145": {
+  "file": "sec_145.mp3",
+  "ms": 1848,
+  "text": "145 seconds"
+ },
+ "sec_15": {
+  "file": "sec_15.mp3",
+  "ms": 1776,
+  "text": "15 seconds"
+ },
+ "sec_150": {
+  "file": "sec_150.mp3",
+  "ms": 1776,
+  "text": "2 minutes thirty"
+ },
+ "sec_155": {
+  "file": "sec_155.mp3",
+  "ms": 1776,
+  "text": "155 seconds"
+ },
+ "sec_160": {
+  "file": "sec_160.mp3",
+  "ms": 1776,
+  "text": "160 seconds"
+ },
+ "sec_165": {
+  "file": "sec_165.mp3",
+  "ms": 1896,
+  "text": "165 seconds"
+ },
+ "sec_170": {
+  "file": "sec_170.mp3",
+  "ms": 1776,
+  "text": "170 seconds"
+ },
+ "sec_175": {
+  "file": "sec_175.mp3",
+  "ms": 1872,
+  "text": "175 seconds"
+ },
+ "sec_180": {
+  "file": "sec_180.mp3",
+  "ms": 1776,
+  "text": "3 minutes"
+ },
+ "sec_20": {
+  "file": "sec_20.mp3",
+  "ms": 1776,
+  "text": "20 seconds"
+ },
+ "sec_25": {
+  "file": "sec_25.mp3",
+  "ms": 1776,
+  "text": "25 seconds"
+ },
+ "sec_30": {
+  "file": "sec_30.mp3",
+  "ms": 1776,
+  "text": "30 seconds"
+ },
+ "sec_35": {
+  "file": "sec_35.mp3",
+  "ms": 1776,
+  "text": "35 seconds"
+ },
+ "sec_40": {
+  "file": "sec_40.mp3",
+  "ms": 1776,
+  "text": "40 seconds"
+ },
  "sec_45": {
   "file": "sec_45.mp3",
   "ms": 1776,
   "text": "45 seconds"
+ },
+ "sec_5": {
+  "file": "sec_5.mp3",
+  "ms": 1776,
+  "text": "5 seconds"
+ },
+ "sec_50": {
+  "file": "sec_50.mp3",
+  "ms": 1776,
+  "text": "50 seconds"
+ },
+ "sec_55": {
+  "file": "sec_55.mp3",
+  "ms": 1776,
+  "text": "55 seconds"
  },
  "sec_60": {
   "file": "sec_60.mp3",
   "ms": 1776,
   "text": "one minute"
  },
+ "sec_65": {
+  "file": "sec_65.mp3",
+  "ms": 1776,
+  "text": "65 seconds"
+ },
+ "sec_70": {
+  "file": "sec_70.mp3",
+  "ms": 1776,
+  "text": "70 seconds"
+ },
  "sec_75": {
   "file": "sec_75.mp3",
   "ms": 1776,
   "text": "75 seconds"
  },
+ "sec_80": {
+  "file": "sec_80.mp3",
+  "ms": 1776,
+  "text": "80 seconds"
+ },
+ "sec_85": {
+  "file": "sec_85.mp3",
+  "ms": 1776,
+  "text": "85 seconds"
+ },
  "sec_90": {
   "file": "sec_90.mp3",
   "ms": 1776,
   "text": "a minute thirty"
+ },
+ "sec_95": {
+  "file": "sec_95.mp3",
+  "ms": 1776,
+  "text": "95 seconds"
  },
  "side_both": {
   "file": "side_both.mp3",
@@ -664,34 +1414,14 @@
   "ms": 1776,
   "text": "meters"
  },
- "u_of": {
-  "file": "u_of.mp3",
-  "ms": 648,
-  "text": "of"
- },
- "u_pounds": {
-  "file": "u_pounds.mp3",
-  "ms": 1776,
-  "text": "pounds"
- },
  "u_reps": {
   "file": "u_reps.mp3",
-  "ms": 1776,
+  "ms": 744,
   "text": "reps"
  },
  "u_seconds": {
   "file": "u_seconds.mp3",
   "ms": 1776,
   "text": "seconds"
- },
- "u_set": {
-  "file": "u_set.mp3",
-  "ms": 720,
-  "text": "set"
- },
- "u_sets": {
-  "file": "u_sets.mp3",
-  "ms": 1776,
-  "text": "sets"
  }
 }

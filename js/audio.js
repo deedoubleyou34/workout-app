@@ -5,9 +5,18 @@
 // backgrounds. speechSynthesis stays only as a last resort for a string with
 // no clip.
 //
-// A cue is an ordered queue of clip ids — ['s_next_up','ex_couch_stretch',
-// 'side_left','sec_120'] — decoded once, cached as AudioBuffers, and scheduled
-// back to back on one AudioContext that stays open for the whole session.
+// A cue is normally ONE clip holding a whole sentence — "Couch stretch. Left
+// side. Two minutes." — because word-at-a-time playback sounded chopped up
+// (Dom, 2026-08-24). js/cues.js derives the sentence and its id; the clip is
+// rendered at build time. When a cue has no composite — an accepted
+// progression can move a target to a value the seed never had — the queue
+// falls back to the word-at-a-time clips rather than going silent.
+//
+// Either way a cue is an ordered queue of clip ids, decoded once, cached as
+// AudioBuffers and scheduled back to back on one AudioContext that stays open
+// for the whole session.
+
+import { cueId, setText, restText, hasSecondsClip, slug } from './cues.js';
 
 let ctx = null;
 let manifest = null;
@@ -16,7 +25,7 @@ const buffers = new Map();      // clip id -> AudioBuffer
 const pending = new Map();      // clip id -> Promise<AudioBuffer>
 let scheduled = [];             // live AudioBufferSourceNodes
 
-const GAP = 0.06;               // seconds between clips; keeps cues from slurring
+const GAP = 0.03;               // seconds between clips in a fallback queue
 
 export function isUnlocked() {
   return unlocked && ctx && ctx.state === 'running';
@@ -123,48 +132,69 @@ export function speak(text) {
 
 // ---------- cue composition ----------
 
-function slug(name) {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').replace(/_+/g, '_');
-}
-
 export function exerciseClip(name) {
   return 'ex_' + slug(name);
 }
 
-const SIDE_CLIP = { left: 'side_left', right: 'side_right', both: null };
-const SPOKEN_SECONDS = new Set([45, 60, 75, 90, 105, 120]);
+export function hasClip(id) {
+  return !!(id && manifest && manifest[id]);
+}
 
-// A number the library actually has a clip for.
+const SIDE_CLIP = { left: 'side_left', right: 'side_right', both: null };
+
+// A number the word-at-a-time library actually has a clip for.
 function numberClips(n) {
-  if (!Number.isFinite(n)) return [];
-  if (n >= 1 && n <= 50 && Number.isInteger(n)) return ['n_' + n];
+  if (!Number.isFinite(n) || !Number.isInteger(n)) return [];
+  if (n >= 1 && n <= 50) return ['n_' + n];
   return [];
 }
 
-// "Couch stretch. Left side. Two minutes."
-export function announceSet({ name, side, targetKind, targetValue, setIndex, totalSets }) {
+// Word-at-a-time, used only when the sentence has no clip of its own.
+function piecewiseSet({ name, side, targetKind, targetValue }) {
   const q = [exerciseClip(name)];
   const sideClip = SIDE_CLIP[side];
   if (sideClip) q.push(sideClip);
-
+  if (targetKind === 'effort' || targetValue == null) return q;
   if (targetKind === 'hold') {
-    if (SPOKEN_SECONDS.has(targetValue)) q.push('sec_' + targetValue);
+    if (hasSecondsClip(targetValue)) q.push('sec_' + targetValue);
     else q.push(...numberClips(targetValue), 'u_seconds');
   } else if (targetKind === 'distance') {
     q.push(...numberClips(targetValue), 'u_meters');
   } else {
     q.push(...numberClips(targetValue), 'u_reps');
   }
-
-  if (setIndex && totalSets && setIndex === totalSets && totalSets > 1) q.push('s_last_set');
   return q;
 }
 
-export function announceRest(seconds, { main = false } = {}) {
-  const q = [main ? 's_main_rest' : 's_rest'];
-  if (SPOKEN_SECONDS.has(seconds)) q.push('sec_' + seconds);
+// "Copenhagen plank. Left side. One minute."  — one clip when we have it.
+export function announceSet(step) {
+  const id = cueId(setText(step));
+  const q = hasClip(id) ? [id] : piecewiseSet(step);
+  if (step.setIndex && step.totalSets && step.setIndex === step.totalSets && step.totalSets > 1) {
+    q.push('s_last_set');
+  }
+  return q;
+}
+
+export function announceRest(seconds, opts = {}) {
+  const text = restText(seconds, opts);
+  if (!text) return [];                       // a five-second gap says nothing
+  const id = cueId(text);
+  if (hasClip(id)) return [id];
+  const q = [opts.main ? 's_main_rest' : 's_rest'];
+  if (hasSecondsClip(seconds)) q.push('sec_' + seconds);
   else q.push(...numberClips(seconds), 'u_seconds');
   return q;
+}
+
+// Every clip id a session could ask for, so preload covers the fallback too.
+export function cueIdsFor(step) {
+  if (step.kind === 'set') return [...new Set([...announceSet(step), ...piecewiseSet(step)])];
+  if (step.kind === 'rest') {
+    const id = cueId(restText(step.seconds, { main: step.main, nextCategory: step.nextCategory }));
+    return [id, 's_rest', 's_main_rest', 'sec_' + step.seconds].filter(Boolean);
+  }
+  return [];
 }
 
 export const CUE_TEN_SECONDS = ['s_ten_seconds'];

@@ -1,6 +1,6 @@
-import { query, storageStatus, exportSqliteBlob, exportJsonBlob, importBytes, getDb, persist } from '../db.js';
+import { query, storageStatus, exportSqliteBlob, exportJsonBlob, exportCsvBlob, importBytes, getDb, persist } from '../db.js';
 import { pendingFlags, acceptFlag, acceptAll, declineFlag, snoozeFlag, isSessionHit } from '../progression.js';
-import { daySummaries, nextDayUp, lastSessionReport, nightlyStreak, today } from '../sessions.js';
+import { daySummaries, nextDayUp, lastSessionReport, nightlyStreak, today, weekStart } from '../sessions.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -37,14 +37,34 @@ export function renderHome(root) {
   // ---------- title + power level ----------
   const header = el('header', 'top');
   header.append(el('h1', null, 'Hyperbolic Time Chamber'));
-  const vol = query(
-    'SELECT COALESCE(SUM(reps_done),0) reps, COALESCE(SUM(hold_seconds_done),0) holds, ' +
-    'COALESCE(SUM(weight_lb*reps_done),0) tonnage FROM set_log')[0];
+  // Power level is a WEEKLY cycle (Dom, 2026-08-24): it counts the four
+  // training days and every nightly session logged since Monday, and starts
+  // again next week. The all-time figure is kept alongside it so a reset reads
+  // as a new week, not as lost work.
+  const from = weekStart();
+  const powerOf = (since) => {
+    const v = query(
+      'SELECT COUNT(*) sets, COALESCE(SUM(l.reps_done),0) reps, ' +
+      'COALESCE(SUM(l.hold_seconds_done),0) holds, COALESCE(SUM(l.weight_lb*l.reps_done),0) tonnage ' +
+      'FROM set_log l JOIN session s ON s.id = l.session_id' +
+      (since ? " WHERE s.date >= ?" : ''), since ? [since] : [])[0];
+    const nights = query('SELECT COUNT(DISTINCT date) c FROM nightly_log'
+      + (since ? ' WHERE date >= ?' : ''), since ? [since] : [])[0].c;
+    return Math.round(v.sets * 100 + v.reps * 10 + v.holds * 5 + v.tonnage / 10 + nights * 50);
+  };
+  const power = powerOf(from);
+  const allTime = powerOf(null);
   const setCount = query('SELECT COUNT(*) c FROM set_log')[0].c;
-  const nightCount = query('SELECT COUNT(*) c FROM nightly_log')[0].c;
-  const power = Math.round(setCount * 100 + vol.reps * 10 + vol.holds * 5 + vol.tonnage / 10 + nightCount * 50);
   header.append(el('p', 'powerline',
     '⚡ Power level: ' + power.toLocaleString() + (power > 9000 ? " — IT'S OVER 9,000!" : '')));
+  const daysThisWeek = query(
+    "SELECT COUNT(DISTINCT day_no) c FROM session WHERE status = 'complete' AND day_no > 0 AND date >= ?",
+    [from])[0].c;
+  const nightsThisWeek = query('SELECT COUNT(DISTINCT date) c FROM nightly_log WHERE date >= ?', [from])[0].c;
+  header.append(el('p', 'weekline',
+    'this week · ' + daysThisWeek + ' of 4 training days · ' + nightsThisWeek
+    + (nightsThisWeek === 1 ? ' night' : ' nights') + ' · resets Monday'
+    + (allTime > power ? ' · all-time ' + allTime.toLocaleString() : '')));
   root.append(header);
 
   // ---------- next up ----------
@@ -179,6 +199,8 @@ export function renderHome(root) {
   expSql.onclick = () => download(exportSqliteBlob(), 'workout-' + today() + '.sqlite');
   const expJson = el('button', 'btn', 'Export .json');
   expJson.onclick = () => download(exportJsonBlob(), 'workout-' + today() + '.json');
+  const expCsv = el('button', 'btn', 'Export .csv');
+  expCsv.onclick = () => download(exportCsvBlob(), 'workout-sets-' + today() + '.csv');
 
   const imp = el('button', 'btn btn-danger', 'Import…');
   const file = document.createElement('input');
@@ -202,7 +224,7 @@ export function renderHome(root) {
     file.value = '';
   };
 
-  row.append(expSql, expJson, imp, file);
+  row.append(expSql, expCsv, expJson, imp, file);
   data.append(row);
   const testLink = el('a', 'testlink', 'Run progression tests →');
   testLink.href = 'tests/test.html';
