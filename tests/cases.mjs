@@ -587,6 +587,12 @@ export async function run(ctx) {
     eq('a stray set of another kind does not contaminate the number',
       bestCapacity([{ reps_done: 10 }, { reps_done: 14 }, { hold_seconds_done: 900 }]),
       { value: 14, kind: 'reps' });
+    // 90/90 hip switches carry a rep target AND per-side holds on one block:
+    // an even split must resolve the same way every week, not by row order
+    eq('an even split of kinds resolves the same way every time',
+      bestCapacity([{ reps_done: 10 }, { hold_seconds_done: 60 }]), { value: 60, kind: 'hold' });
+    eq('and the same regardless of which arrived first',
+      bestCapacity([{ hold_seconds_done: 60 }, { reps_done: 10 }]), { value: 60, kind: 'hold' });
   }
 
   // 38. gap_pct per §4.4, including the case worth having: the biased side
@@ -604,8 +610,9 @@ export async function run(ctx) {
   //     Four weeks apart, moved 11 points toward zero -> Closing.
   {
     const rows = [
-      { date: '2026-06-01', side: 'left', weight_lb: 40, reps_done: 8 },
-      { date: '2026-06-01', side: 'right', weight_lb: 50, reps_done: 8 },
+      // explicit nulls: this is the row shape sql.js getAsObject() produces
+      { date: '2026-06-01', side: 'left', weight_lb: 40, reps_done: 8, hold_seconds_done: null },
+      { date: '2026-06-01', side: 'right', weight_lb: 50, reps_done: 8, hold_seconds_done: null },
       { date: '2026-06-04', side: 'left', weight_lb: 40, reps_done: 7 },
       { date: '2026-06-04', side: 'right', weight_lb: 50, reps_done: 7 },
       { date: '2026-06-29', side: 'left', weight_lb: 50, reps_done: 8 },
@@ -629,8 +636,9 @@ export async function run(ctx) {
   //     Week of 2026-06-22: left 40 s, right 45 s -> (45-40)/45 = 11.1% -> 11%
   {
     const rows = [
-      { date: '2026-06-01', side: 'left', hold_seconds_done: 30 },
-      { date: '2026-06-01', side: 'right', hold_seconds_done: 45 },
+      // explicit nulls: this is the row shape sql.js getAsObject() produces
+      { date: '2026-06-01', side: 'left', weight_lb: null, reps_done: null, hold_seconds_done: 30 },
+      { date: '2026-06-01', side: 'right', weight_lb: null, reps_done: null, hold_seconds_done: 45 },
       { date: '2026-06-03', side: 'left', hold_seconds_done: 28 },
       { date: '2026-06-03', side: 'right', hold_seconds_done: 45 },
       { date: '2026-06-22', side: 'left', hold_seconds_done: 40 },

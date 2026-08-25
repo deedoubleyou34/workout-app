@@ -228,6 +228,13 @@ export function renderRun(root, dayNo) {
     const status = el('span', 'lockdot' + (wakeLockLost ? ' lost' : ''),
       (audio.isUnlocked() ? '🔊' : '🔇') + ' ' + (wakeLockLost ? 'screen may sleep' : 'screen held'));
     bar.append(status);
+    // duck/restore cycles, so the Phase 6 gate is a number he reads rather
+    // than an impression he reports
+    const duck = ducking.stats();
+    if (duck.ducks) {
+      bar.append(el('span', 'duckdot' + (duck.failures ? ' lost' : ''),
+        '♪ ' + duck.restores + '/' + duck.ducks + (duck.failures ? ' · ' + duck.failures + ' failed' : '')));
+    }
     root.append(bar);
 
     const track = el('div', 'runtrack');

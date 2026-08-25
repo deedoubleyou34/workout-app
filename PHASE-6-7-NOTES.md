@@ -1,6 +1,6 @@
 # Phases 6 and 7 — what I built while you were reviewing
 
-**Written:** 2026-08-25 · **Live build:** 018 · **Phases 0–7 are now built and deployed.**
+**Written:** 2026-08-25 · **Live build:** 019 · **Phases 0–7 are now built and deployed.**
 
 I have not touched `WHERE-I-LEFT-OFF.md` — that one is yours until you send it back. Everything from these two phases is in this file instead. Read it, mark it up however you like, and send both back together.
 
@@ -36,7 +36,7 @@ The answer is remembered per device, so it only probes once per speaker.
 ### Phase 6 gate — needs you and real music
 
 - [ ] Start music on your phone, run a session, and check **every cue is audible over it**.
-- [ ] At least **9 of 10 duck/restore cycles clean** — music comes down, cue lands, music comes back.
+- [ ] At least **9 of 10 duck/restore cycles clean** — music comes down, cue lands, music comes back. You don't have to count these by feel: the runner's top bar shows `♪ 14/14` (restores over ducks) once ducking starts, and turns red with a failure count if any cycle broke. Read it at the end of the session and tell me the number.
 - [ ] **Volume always returns to where it was.** Never left sitting at 25%.
 - [ ] Home → Music → **Check cues over music** names a strategy for your device, and it's the right one.
 - [ ] **Abandon a session halfway** (the ✕ in the runner) → volume comes back, not left ducked.
@@ -96,7 +96,7 @@ Come back to the first and third after three weeks of real sessions and tell me 
 
 I also added a pre-deploy check that the tests could never do: the test suite proves every import in the code it runs, but the screen-drawing modules aren't run by any test, so a renamed function there would have been a blank screen on your phone with nothing catching it first. `tools/verify_imports.mjs` now checks all 141 of them before every deploy.
 
-**Test suite is now 130 cases** (it was 89 when you last saw a number). If you run the tests on the phone, expect **ALL 130 TESTS PASSED**.
+**Test suite is now 132 cases** (it was 89 when you last saw a number). If you run the tests on the phone, expect **ALL 132 TESTS PASSED**.
 
 ## What Phase 8 would be
 

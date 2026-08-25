@@ -57,9 +57,18 @@ let sessionPlan = null;   // { strategy, deviceId, priorVolume, wasPlaying, note
 let cycle = { ducked: false, duckedAt: 0, releaseAt: 0 };
 let releaseTimer = null;
 let failures = 0;
+let ducks = 0;
+let restores = 0;
 
 export function currentPlan() {
   return sessionPlan;
+}
+
+// The Phase 6 exit gate asks for "9 of 10 duck/restore cycles clean". Counting
+// them is the difference between Dom reading a number and Dom estimating a
+// feeling, so the runner shows this in its top bar.
+export function stats() {
+  return { ducks, restores, failures, strategy: sessionPlan ? sessionPlan.strategy : null };
 }
 
 async function cachedStrategies() {
@@ -153,6 +162,8 @@ function reset() {
   releaseTimer = null;
   cycle = { ducked: false, duckedAt: 0, releaseAt: 0 };
   failures = 0;
+  ducks = 0;
+  restores = 0;
 }
 
 // ---------- duck / restore ----------
@@ -198,6 +209,7 @@ function scheduleRelease() {
     cycle = { ducked: false, duckedAt: 0, releaseAt: 0 };
     try {
       await applyRestore();
+      restores++;
     } catch {
       failures++;
     }
@@ -218,6 +230,7 @@ export async function speakOver(playFn) {
   if (!wasDucked) {
     try {
       await applyDuck();
+      ducks++;
     } catch {
       failures++;
       // Two failures and we stop fighting the device for the rest of the
@@ -242,7 +255,10 @@ export async function end() {
   const wasDucked = cycle.ducked;
   cycle = { ducked: false, duckedAt: 0, releaseAt: 0 };
   if (wasDucked) {
-    try { await applyRestore(); } catch { /* the stranded record survives for next launch */ }
+    try {
+      await applyRestore();
+      restores++;
+    } catch { /* the stranded record survives for next launch */ }
   }
   sessionPlan = null;
 }

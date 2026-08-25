@@ -24,6 +24,12 @@ export function capacityOf(row) {
   return { value: row.reps_done, kind: 'reps' };
 }
 
+// Ties are broken by this order rather than by however the rows arrived.
+// 90/90 hip switches carry one rep target and two per-side holds on the same
+// block; without a fixed rule the label under the chart could read "reps" one
+// week and "s held" the next purely on row order.
+const KIND_RANK = { hold: 0, load: 1, reps: 2 };
+
 // Best set of the group. Sets of different kinds are not comparable, so the
 // kind with the most sets wins and the others are ignored rather than mixed.
 export function bestCapacity(rows) {
@@ -37,9 +43,9 @@ export function bestCapacity(rows) {
   if (!byKind.size) return null;
   let best = null;
   for (const [kind, values] of byKind) {
-    if (!best || values.length > best.count) {
-      best = { kind, count: values.length, value: Math.max(...values) };
-    }
+    const better = !best || values.length > best.count
+      || (values.length === best.count && KIND_RANK[kind] < KIND_RANK[best.kind]);
+    if (better) best = { kind, count: values.length, value: Math.max(...values) };
   }
   return { value: best.value, kind: best.kind };
 }

@@ -615,3 +615,5 @@ html, body {
 .chart-key.emphasis { color: var(--fg); font-weight: 700; }
 .chart-key i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 .chartunit { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+.duckdot { font-size: 0.68rem; color: var(--muted); letter-spacing: 0.02em; }
+.duckdot.lost { color: var(--miss); }
