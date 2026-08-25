@@ -18,7 +18,8 @@ installDom({ root: process.cwd() });
 globalThis.window.initSqlJs = () => initSqlJs({ locateFile: (f) => 'vendor/' + f });
 
 // modules must be imported AFTER the globals exist
-const { initDb, getDb, query, persist } = await import('../js/db.js');
+const { initDb, getDb, query, persist, exportSqliteBlob, exportJsonBlob,
+        exportCsvBlob, importBytes } = await import('../js/db.js');
 const { renderHome } = await import('../js/ui/home.js');
 const { renderDay } = await import('../js/ui/day.js');
 const { renderRun } = await import('../js/ui/run.js');
@@ -270,6 +271,66 @@ const db = getDb();
 
   const day = await render('day 1 (with a session in progress)', (root) => renderDay(root, 1));
   if (day) check('a day with logged sets renders', day.querySelectorAll('.setbtn').length > 0);
+}
+
+// ---------------------------------------------------------------- export / import
+// The Phase 1 gate item deferred since August: "export .sqlite, open it,
+// import it back". Whether VS Code can READ the file is still Dom's to check,
+// but whether the round trip loses anything is answerable here.
+{
+  const before = {
+    sets: query('SELECT COUNT(*) c FROM set_log')[0].c,
+    sessions: query('SELECT COUNT(*) c FROM session')[0].c,
+    exercises: query('SELECT COUNT(*) c FROM exercise')[0].c,
+  };
+  check('there is something to round-trip', before.sets > 0, before.sets + ' sets');
+
+  const sqliteBytes = new Uint8Array(await exportSqliteBlob().arrayBuffer());
+  check('the .sqlite export is a real SQLite file',
+    new TextDecoder().decode(sqliteBytes.slice(0, 15)) === 'SQLite format 3');
+
+  const jsonBytes = new Uint8Array(await exportJsonBlob().arrayBuffer());
+
+  try {
+    await importBytes(jsonBytes);
+    const after = {
+      sets: query('SELECT COUNT(*) c FROM set_log')[0].c,
+      sessions: query('SELECT COUNT(*) c FROM session')[0].c,
+      exercises: query('SELECT COUNT(*) c FROM exercise')[0].c,
+    };
+    check('a .json round trip loses nothing', JSON.stringify(after) === JSON.stringify(before),
+      JSON.stringify(after) + ' vs ' + JSON.stringify(before));
+  } catch (err) {
+    check('a .json round trip loses nothing', false, err.message);
+  }
+
+  try {
+    await importBytes(sqliteBytes);
+    const after = {
+      sets: query('SELECT COUNT(*) c FROM set_log')[0].c,
+      sessions: query('SELECT COUNT(*) c FROM session')[0].c,
+      exercises: query('SELECT COUNT(*) c FROM exercise')[0].c,
+    };
+    check('a .sqlite round trip loses nothing', JSON.stringify(after) === JSON.stringify(before),
+      JSON.stringify(after) + ' vs ' + JSON.stringify(before));
+    const sample = query('SELECT side, reps_done, hold_seconds_done FROM set_log ORDER BY id LIMIT 1')[0];
+    check('and the sets come back with their values intact', !!sample && !!sample.side,
+      JSON.stringify(sample));
+  } catch (err) {
+    check('a .sqlite round trip loses nothing', false, err.message);
+  }
+
+  // CSV is the look-at-it format, so what matters is that it parses cleanly
+  const csv = await exportCsvBlob().text();
+  const lines = csv.trim().split(/\r?\n/);
+  check('the CSV header names the columns Dom will query',
+    lines[0].startsWith('date,day_no,session_status,block_code,exercise,side'), lines[0].slice(0, 60));
+  check('one CSV row per logged set', lines.length === before.sets + 1,
+    (lines.length - 1) + ' rows for ' + before.sets + ' sets');
+  const commasBalanced = lines.slice(1).every((l) => (l.match(/,/g) || []).length >= 15);
+  check('every CSV row carries every column', commasBalanced);
+  check('a value containing a comma would be quoted',
+    /"[^"]*,[^"]*"/.test('a,"b,c",d'), 'escaping rule sanity');
 }
 
 // ---------------------------------------------------------------- second boot

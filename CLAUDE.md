@@ -102,6 +102,8 @@ Running record of audit findings and decisions made as phases progress. Newest f
 
 **It found a real bug on the first honest run.** A hold logs the seconds actually held. Press Done the instant the screen appears and that is `0` — and zero is a **miss**, fed straight to the progression engine, from a set Dom never even started. The Done button is now disabled until the clock has run, and it says what it will log (`Done · 12s held`). Skipping a set you are not doing is what `skip ›` is for; Done is for recording what happened.
 
+It also retires half of the Phase 1 gate item that has been deferred since August. "Export `.sqlite`, open it, import it back" was waiting on Dom reaching a PC — but only the *open it in a viewer* half actually needs him. Whether the round trip loses anything is answerable here, and now checked both ways: `.json` and `.sqlite` both re-import to identical row counts with values intact, and the CSV parses to one row per logged set with every column present.
+
 Deploy loop is now five commands:
 
 ```
