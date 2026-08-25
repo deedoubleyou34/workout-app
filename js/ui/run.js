@@ -363,6 +363,11 @@ export function renderRun(root, dayNo) {
 
     const doneBtn = el('button', 'btn btn-primary donebtn', effort ? 'Logged' : 'Done');
     doneBtn.onclick = () => commit(timed ? Math.round(holdElapsedMs() / 1000) : null);
+    // A hold logs the seconds actually held, so pressing Done the instant the
+    // screen appears would log a zero — and a zero is a MISS that feeds the
+    // progression engine. Until the clock has run, there is nothing to log:
+    // "skip" is the way past a set you are not doing.
+    if (timed) doneBtn.disabled = true;
     root.append(doneBtn);
 
     const nav = el('div', 'runnav');
@@ -423,6 +428,10 @@ export function renderRun(root, dayNo) {
       clock.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
       clock.classList.toggle('running', hold.running);
       if (holdRing) holdRing.update(tgt.value ? left / tgt.value : 0);
+      const held = Math.round(holdElapsedMs() / 1000);
+      doneBtn.disabled = held < 1 && !stale;
+      doneBtn.textContent = stale ? 'Log ' + (mainIn ? mainIn.value : tgt.value) + 's'
+        : held > 0 ? 'Done · ' + held + 's held' : 'Done';
       playBtn.textContent = hold.running ? '⏸  Pause' : '▶  Start';
       if (left === 0 && hold.running && !stale) {
         hold.running = false;

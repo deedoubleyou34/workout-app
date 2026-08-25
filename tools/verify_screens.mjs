@@ -1,0 +1,291 @@
+// Execute every screen in Node against a real seeded database.
+// Usage: node tools/verify_screens.mjs   (from the repo root)
+//
+// Until this existed, the UI modules had never RUN anywhere: `node --check`
+// proves syntax and verify_imports.mjs proves the names exist, but neither
+// catches `step.taget`, a wrong argument order, or a null read. Those are
+// blank screens on Dom's phone, mid-session, during weeks he cannot redo.
+//
+// The DOM stub is strict on purpose (see tools/domstub.mjs): an unimplemented
+// property read is an error, not a silent undefined.
+import { createRequire } from 'module';
+import { installDom, clearAllTimers } from './domstub.mjs';
+
+const require = createRequire(import.meta.url);
+const initSqlJs = require('../vendor/sql-wasm.js');
+
+installDom({ root: process.cwd() });
+globalThis.window.initSqlJs = () => initSqlJs({ locateFile: (f) => 'vendor/' + f });
+
+// modules must be imported AFTER the globals exist
+const { initDb, getDb, query, persist } = await import('../js/db.js');
+const { renderHome } = await import('../js/ui/home.js');
+const { renderDay } = await import('../js/ui/day.js');
+const { renderRun } = await import('../js/ui/run.js');
+const { renderDashboard } = await import('../js/ui/dashboard.js');
+const { renderSettings } = await import('../js/ui/settings.js');
+const { buildSteps, stepTarget } = await import('../js/runner.js');
+const { saveRunnerState } = await import('../js/sessions.js');
+
+let failures = 0;
+function check(name, ok, detail = '') {
+  console.log((ok ? 'PASS' : 'FAIL') + '  ' + name + (detail ? '  [' + detail + ']' : ''));
+  if (!ok) failures++;
+}
+
+// Click handlers in the app are async (audio unlock, wake lock, persist), so
+// the harness has to let the microtask queue drain before looking at what the
+// click produced. Without this it reads the screen the click was leaving.
+const tick = async (n = 3) => {
+  for (let i = 0; i < n; i++) await new Promise((r) => setImmediate(r));
+};
+
+function screen() {
+  const root = globalThis.document.createElement('main');
+  globalThis.document.body.append(root);
+  return root;
+}
+
+function contains(root, text) {
+  return root.textContent.includes(text);
+}
+
+async function render(name, fn) {
+  const root = screen();
+  try {
+    await fn(root);
+    return root;
+  } catch (err) {
+    check(name + ' renders', false, err.message);
+    console.log(String(err.stack).split('\n').slice(1, 4).join('\n'));
+    return null;
+  }
+}
+
+await initDb();
+const db = getDb();
+
+// ---------------------------------------------------------------- empty app
+{
+  const home = await render('home (empty)', (root) => renderHome(root));
+  if (home) {
+    check('home renders on a brand-new database', true);
+    check('home shows the power level', contains(home, 'Power level'), home.textContent.slice(0, 60));
+    check('home names the next day up', /Day [1-4]/.test(home.textContent));
+    check('home offers a run link', !!home.querySelector('.nextstart'));
+    check('a fresh database does NOT nag for a backup', !home.querySelector('.backupcard'));
+  }
+
+  const day = await render('day 1', (root) => renderDay(root, 1));
+  if (day) {
+    const buttons = day.querySelectorAll('.setbtn').length;
+    check('day 1 renders set buttons', buttons > 0, buttons + ' buttons');
+    check('day 1 shows the build number', contains(day, 'build'), '');
+    check('day 1 shows section tabs', day.querySelectorAll('.tab').length > 0);
+  }
+
+  const nightly = await render('nightly (day 0)', (root) => renderDay(root, 0));
+  if (nightly) check('the nightly screen renders', contains(nightly, 'Nightly'));
+
+  const dash = await render('dashboard (empty)', (root) => renderDashboard(root));
+  if (dash) {
+    check('an empty dashboard says so rather than drawing nothing',
+      contains(dash, 'Nothing to chart yet'));
+    check('and still offers the nightly log', contains(dash, 'Log tonight'));
+  }
+
+  const settings = await render('settings', (root) => renderSettings(root));
+  if (settings) {
+    check('settings renders all four playlist phases',
+      settings.querySelectorAll('.phaserow').length === 4,
+      settings.querySelectorAll('.phaserow').length + ' rows');
+    check('settings offers the start-fresh button', contains(settings, 'Delete all training data'));
+    check('settings offers a backup', contains(settings, 'Export .sqlite'));
+  }
+}
+
+// ---------------------------------------------------------------- the runner
+{
+  const root = screen();
+  try {
+    renderRun(root, 4);
+  } catch (err) {
+    check('the runner gate renders', false, err.message);
+    console.log(String(err.stack).split('\n').slice(1, 4).join('\n'));
+  }
+  const gate = root.querySelector('.gatecard');
+  check('the runner opens behind a start gate', !!gate);
+  check('the gate counts the session', /\d+ sets/.test(root.textContent), root.textContent.slice(0, 80));
+
+  // "Start without voice": no AudioContext to stub, and the ducking path is
+  // exercised separately below
+  const silent = root.children.find((c) => c.textContent === 'Start without voice');
+  check('the gate offers a silent start', !!silent);
+  if (silent) {
+    silent.click();
+    await tick();
+    check('the gate gives way to the session', !root.querySelector('.gatecard'));
+    check('the first step is a set, not a rest', !!root.querySelector('.runcard'));
+    check('the runner shows the build number', /b\w+/.test(root.textContent));
+  }
+
+  // walk forward through ~20 steps, pressing whatever the primary button is
+  let logged = 0;
+  let sawRest = false;
+  let sawRing = false;
+  for (let i = 0; i < 20; i++) {
+    const before = query('SELECT COUNT(*) c FROM set_log')[0].c;
+    const primary = root.querySelector('.donebtn');
+    if (!primary) break;
+    if (root.querySelector('.restcard')) {
+      sawRest = true;
+      if (root.querySelector('.ring')) sawRing = true;
+    }
+    // A hold whose clock has not run yet refuses to log. That is the point —
+    // step past it the way Dom would, with skip.
+    const stepper = primary.disabled
+      ? root.querySelectorAll('.btn-small').find((b) => b.textContent.startsWith('skip'))
+      : primary;
+    if (!stepper) break;
+    try {
+      stepper.click();
+      await tick();
+    } catch (err) {
+      check('step ' + i + ' advances', false, err.message);
+      console.log(String(err.stack).split('\n').slice(1, 4).join('\n'));
+      break;
+    }
+    if (query('SELECT COUNT(*) c FROM set_log')[0].c > before) logged++;
+  }
+  check('walking the runner logs sets', logged > 0, logged + ' sets logged');
+  check('the walk passed through a rest step', sawRest);
+  check('rests draw a countdown ring', sawRing);
+
+  const rows = query(
+    'SELECT s.side, s.reps_done, s.hold_seconds_done, s.hit_target FROM set_log s ORDER BY s.id LIMIT 1');
+  check('a logged set records a side and a result', rows.length === 1 && !!rows[0].side,
+    JSON.stringify(rows[0]));
+  const zeroHolds = query('SELECT COUNT(*) c FROM set_log WHERE hold_seconds_done = 0')[0].c;
+  check('no zero-second hold was logged — a premature Done cannot fake a miss',
+    zeroHolds === 0, zeroHolds + ' zero-second holds');
+  clearAllTimers();
+}
+
+// ---------------------------------------------------------------- hold + sled
+// Both are new code paths, and neither has ever executed. Day 1 has the sled
+// under 'power'; holds are everywhere.
+{
+  const day1 = query('SELECT * FROM day_template WHERE day_no = 1')[0];
+  const blocks = query(
+    'SELECT b.*, e.name ex_name, e.is_timed, e.load_type, e.instruction, e.feel_cue ' +
+    'FROM block b JOIN exercise e ON e.id = b.exercise_id WHERE b.day_template_id = ? ORDER BY b.order_index',
+    [day1.id]);
+  for (const b of blocks) b.targets = query('SELECT * FROM block_target WHERE block_id = ? ORDER BY id', [b.id]);
+  const steps = buildSteps(blocks);
+
+  const holdAt = steps.findIndex((s) => s.kind === 'set' && stepTarget(s).kind === 'hold');
+  const effortAt = steps.findIndex((s) => s.kind === 'set' && stepTarget(s).kind === 'effort');
+  check('day 1 has a hold step to exercise', holdAt >= 0);
+  check('day 1 has a sled (effort) step to exercise', effortAt >= 0);
+
+  const openAt = async (index, label, extra = {}) => {
+    const session = query("SELECT * FROM session WHERE day_no = 1 AND status = 'in_progress' ORDER BY id DESC LIMIT 1")[0]
+      || null;
+    if (!session) return null;
+    saveRunnerState(db, { session_id: session.id, index, restStartedAt: null, ...extra });
+    await persist();
+    const root = screen();
+    try {
+      renderRun(root, 1);
+      const silent = root.children.find((c) => c.textContent === 'Start without voice');
+      if (silent) { silent.click(); await tick(); }
+      return root;
+    } catch (err) {
+      check(label, false, err.message);
+      console.log(String(err.stack).split('\n').slice(1, 4).join('\n'));
+      return null;
+    }
+  };
+
+  // open the day so a session exists
+  const seedRoot = screen();
+  renderRun(seedRoot, 1);
+  const silentStart = seedRoot.children.find((c) => c.textContent === 'Start without voice');
+  if (silentStart) { silentStart.click(); await tick(); }
+  clearAllTimers();
+
+  if (holdAt >= 0) {
+    const root = await openAt(holdAt, 'a hold step renders');
+    if (root) {
+      check('a hold step draws its own clock', !!root.querySelector('.holdclock'));
+      check('a hold step draws a ring', !!root.querySelector('.dial-hold'));
+      const play = root.querySelector('.holdbtn');
+      check('a hold step offers pause/start', !!play);
+      if (play) {
+        const first = play.textContent;
+        play.click();
+        check('the hold clock pauses and resumes', play.textContent !== first,
+          first + ' -> ' + play.textContent);
+      }
+      clearAllTimers();
+    }
+
+    // the stale-resume branch: a hold whose target elapsed while the app was dead
+    const stale = await openAt(holdAt, 'a hold resumed after the app died renders',
+      { hold: { index: holdAt, startedAt: Date.now() - 10 * 60 * 1000, accMs: 0, running: true } });
+    if (stale) {
+      check('a hold that ran on while the app was closed warns instead of logging itself',
+        stale.textContent.includes('ran while the app was closed'),
+        stale.textContent.slice(0, 120));
+      clearAllTimers();
+    }
+  }
+
+  if (effortAt >= 0) {
+    const root = await openAt(effortAt, 'a sled step renders');
+    if (root) {
+      check('a sled step asks for weight, not reps',
+        root.textContent.includes('one trip') && !root.textContent.includes(' reps'),
+        root.textContent.slice(0, 140));
+      const before = query('SELECT COUNT(*) c FROM set_log')[0].c;
+      const done = root.querySelector('.donebtn');
+      if (done) { done.click(); await tick(); }
+      const after = query('SELECT * FROM set_log ORDER BY id DESC LIMIT 1')[0];
+      check('a sled set logs as done with no rep count',
+        query('SELECT COUNT(*) c FROM set_log')[0].c === before + 1
+        && after.reps_done === null && after.hit_target === 1,
+        JSON.stringify(after && { reps: after.reps_done, hit: after.hit_target }));
+      clearAllTimers();
+    }
+  }
+}
+
+// ---------------------------------------------------------------- with history
+{
+  const home = await render('home (with a session logged)', (root) => renderHome(root));
+  if (home) check('home still renders once there is history', contains(home, 'Power level'));
+
+  const dash = await render('dashboard (with a session logged)', (root) => renderDashboard(root));
+  if (dash) check('the dashboard renders with real rows behind it', dash.textContent.length > 50);
+
+  const day = await render('day 1 (with a session in progress)', (root) => renderDay(root, 1));
+  if (day) check('a day with logged sets renders', day.querySelectorAll('.setbtn').length > 0);
+}
+
+// ---------------------------------------------------------------- second boot
+// The stored branch of initDb() with migrations, which is what the phone runs
+// on every update.
+{
+  try {
+    await initDb();
+    check('a second launch reads the stored database and migrates cleanly', true);
+    check('the logged sets survived the reload',
+      query('SELECT COUNT(*) c FROM set_log')[0].c > 0);
+  } catch (err) {
+    check('a second launch reads the stored database and migrates cleanly', false, err.message);
+  }
+}
+
+clearAllTimers();
+console.log(failures === 0 ? '\nALL SCREENS RENDER' : '\n' + failures + ' SCREEN CHECK(S) FAILED');
+process.exit(failures === 0 ? 0 : 1);

@@ -92,6 +92,22 @@ Do not scaffold future phases "while you're in there." The gates exist because i
 
 Running record of audit findings and decisions made as phases progress. Newest first. Add an entry whenever a phase surfaces something that changes the plan, the spec, or how we work.
 
+### 2026-08-25 — The screens finally ran somewhere (build 022)
+
+`tools/domstub.mjs` + `tools/verify_screens.mjs`. Every UI module now executes in Node against a real seeded database. Until this existed they had never RUN anywhere: `node --check` proves syntax and `verify_imports.mjs` proves the names exist, but neither catches `step.taget`, a wrong argument order, or a null read — and those are blank screens on Dom's phone, mid-session, during three weeks he cannot redo.
+
+**The stub is strict on purpose.** Reading a property nothing ever defined throws, rather than returning `undefined`. A permissive stub lets a render "pass" while the real browser dies; strictness is what makes a green run worth believing. Same reasoning for honouring `disabled`: a stub that clicks a disabled button hides exactly the guards that stop bad rows being written.
+
+43 checks: every screen on an empty database and again with history, the runner walked step by step with real clicks, and both new step kinds — a hold and a sled — driven through their own branches. It also boots `initDb()` twice in one process so the **stored-database branch and the migrations run**, which is the path the phone takes on every update and which no other check exercised.
+
+**It found a real bug on the first honest run.** A hold logs the seconds actually held. Press Done the instant the screen appears and that is `0` — and zero is a **miss**, fed straight to the progression engine, from a set Dom never even started. The Done button is now disabled until the clock has run, and it says what it will log (`Done · 12s held`). Skipping a set you are not doing is what `skip ›` is for; Done is for recording what happened.
+
+Deploy loop is now five commands:
+
+```
+node tools/run_tests.mjs && node tools/verify_seed.mjs && node tools/verify_migration.mjs   && node tools/verify_imports.mjs && node tools/verify_screens.mjs
+```
+
 ### 2026-08-25 — Phase 8 and the last mile (build 020). The spec is complete.
 
 **Phase 8 — playlist switching** (`js/playlists.js`, `js/ui/settings.js` at `#/settings`). Four playlists mapped to session phases; the runner switches at each boundary. The parser takes a share link, a localised `intl-xx` link, a URI or a bare id, because that is the only way a link ever actually gets entered.
