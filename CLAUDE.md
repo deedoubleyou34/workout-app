@@ -92,6 +92,24 @@ Do not scaffold future phases "while you're in there." The gates exist because i
 
 Running record of audit findings and decisions made as phases progress. Newest first. Add an entry whenever a phase surfaces something that changes the plan, the spec, or how we work.
 
+### 2026-08-25 — Phase 8 and the last mile (build 020). The spec is complete.
+
+**Phase 8 — playlist switching** (`js/playlists.js`, `js/ui/settings.js` at `#/settings`). Four playlists mapped to session phases; the runner switches at each boundary. The parser takes a share link, a localised `intl-xx` link, a URI or a bare id, because that is the only way a link ever actually gets entered.
+
+- **The switch waits for the cue** (`ducking.whenClear`). Fired mid-duck it would start the new playlist at 25% volume, or — on the pause strategy — start music straight over the cue that had just paused it.
+- `spotify.player.play()` gained an optional context uri and **keeps sending no body without one**. A `context_uri` on the post-cue resume would restart the playlist from track one after every single cue.
+- A failed switch is swallowed: the gate is explicit that it degrades to "music keeps playing", never to a stalled session.
+
+**The backup nag — a risk-register mitigation that was never built.** The register's answer to "Safari evicts IndexedDB, training history lost" is a prompt every 10 sessions, and nothing implemented it. Found it while auditing the spec end to end before Dom starts logging three weeks of real data — which is exactly the data it protects. Home shows a card at 10 completed sessions since the last `.sqlite` export. Only `.sqlite` clears it; clearing the nag with a CSV would be clearing it with a format that cannot restore anything.
+
+**Start fresh** (`resetTrainingData`). Dom asked for everything logged during development to be cleared before the real test. Deletes sessions, sets, loads, flags and nightly rows; keeps the library, the day templates and the playlist mapping. Deliberately **not** a blanket `DELETE FROM meta`: dropping `schema_version` sends the next launch back through every migration against an already-current schema and fails on the first `ALTER TABLE`. It also clears `duck-stranded` and `duck-strategies`, which live in the kv store outside the database blob. Never automatic — a button that erases training history fires only because a human pressed it.
+
+**Countdown rings** on rests and holds, per the session walkthrough. The ring moves one attribute per tick rather than rebuilding the node.
+
+**Spec audit — four deliberate divergences, all flagged to Dom rather than guessed.** The walkthrough's cue says the set number and the weight ("Set one of five. Eight reps. Two twenty-five"); the summary is spoken as well as displayed; and the warm-up is meant to need zero taps. The first two lose against Dom's only note on cue content — *speed them up* — which post-dates the spec and which cost real budget to satisfy (+8% → +18%, short rests silenced). The fourth is the interesting one: a zero-tap warm-up means **writing reps to `set_log` that Dom never confirmed**. That is the app recording something that may not have happened, and it is not a call to make on his behalf, even though warm-ups never reach the progression engine. All four are in `PHASE-8-NOTES.md` as questions.
+
+Suite at **161 cases**.
+
 ### 2026-08-25 — A pre-deploy check the test suite could never do
 
 `tools/verify_imports.mjs`. Node proves every named import for anything the test
