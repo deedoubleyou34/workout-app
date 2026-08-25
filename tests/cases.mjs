@@ -15,6 +15,9 @@ import { setText, restText, cueId, spokenSeconds, hasSecondsClip } from '../js/c
 import { needsRefresh, callbackParams, retryAfterMs, describeError,
          nowPlayingText } from '../js/spotify.js';
 import { pickStrategy, planCycle, canRelease, MIN_CYCLE_MS } from '../js/ducking.js';
+import { capacityOf, bestCapacity, gapPct, weeklySeries,
+         verdictFor } from '../js/asymmetry.js';
+import { niceBounds } from '../js/charts.js';
 
 const EX = {
   slRdl:      { id: 1, name: 'Single-leg RDL (DB)', category: 'strength',   load_type: 'dumbbell',   is_timed: 0, increment_value: 5,  increment_unit: 'lb' },
@@ -564,6 +567,120 @@ export async function run(ctx) {
     const long = planCycle({ ducked: false }, t, 4000);
     check('a four-second cue is not cut off at 1.5 s', long.releaseAt >= t + 4000);
     check('nothing releases a cycle that was never ducked', !canRelease({ ducked: false }, t + 99999));
+  }
+
+  // 37. capacity: §4.4 says MAX(weight_lb * reps_done), which is NULL for the
+  //     bodyweight unilateral work — Copenhagen planks, glute bridges,
+  //     clamshells — i.e. most of the asymmetry work in the program.
+  {
+    eq('a loaded set is weight times reps',
+      capacityOf({ weight_lb: 40, reps_done: 8 }), { value: 320, kind: 'load' });
+    eq('a timed set is the seconds held',
+      capacityOf({ hold_seconds_done: 45 }), { value: 45, kind: 'hold' });
+    eq('a bodyweight set counts its reps rather than counting nothing',
+      capacityOf({ weight_lb: null, reps_done: 12 }), { value: 12, kind: 'reps' });
+    check('a sled effort set has no capacity to compare',
+      capacityOf({ weight_lb: 180, reps_done: null }) === null);
+    eq('the best set of the week wins',
+      bestCapacity([{ reps_done: 10 }, { reps_done: 14 }, { reps_done: 12 }]),
+      { value: 14, kind: 'reps' });
+    eq('a stray set of another kind does not contaminate the number',
+      bestCapacity([{ reps_done: 10 }, { reps_done: 14 }, { hold_seconds_done: 900 }]),
+      { value: 14, kind: 'reps' });
+  }
+
+  // 38. gap_pct per §4.4, including the case worth having: the biased side
+  //     overtaking, which must read as words and not as a minus sign
+  {
+    eq('gap is measured against the strong side', Math.round(gapPct(400, 320)), 20);
+    check('a stronger biased side gives a negative gap', gapPct(400, 440) < 0);
+    check('no capacity on one side is not a zero gap', gapPct(400, null) === null);
+    check('a zero strong side does not divide by zero', gapPct(0, 0) === null);
+  }
+
+  // 39. HAND-COMPUTED, exercise one — Single-leg RDL (DB), loaded, bias LEFT.
+  //     Week of 2026-06-01: left 40x8 = 320, right 50x8 = 400 -> (400-320)/400 = 20%
+  //     Week of 2026-06-29: left 50x8 = 400, right 55x8 = 440 -> (440-400)/440 = 9.09% -> 9%
+  //     Four weeks apart, moved 11 points toward zero -> Closing.
+  {
+    const rows = [
+      { date: '2026-06-01', side: 'left', weight_lb: 40, reps_done: 8 },
+      { date: '2026-06-01', side: 'right', weight_lb: 50, reps_done: 8 },
+      { date: '2026-06-04', side: 'left', weight_lb: 40, reps_done: 7 },
+      { date: '2026-06-04', side: 'right', weight_lb: 50, reps_done: 7 },
+      { date: '2026-06-29', side: 'left', weight_lb: 50, reps_done: 8 },
+      { date: '2026-06-29', side: 'right', weight_lb: 55, reps_done: 8 },
+      { date: '2026-07-02', side: 'both', weight_lb: 90, reps_done: 8 },   // must be ignored
+    ];
+    const series = weeklySeries(rows, 'left');
+    eq('two weeks of data, both sides present', series.length, 2);
+    eq('week one capacities match the hand computation',
+      [series[0].left, series[0].right, Math.round(series[0].gapPct)], [320, 400, 20]);
+    eq('week two capacities match the hand computation',
+      [series[1].left, series[1].right, Math.round(series[1].gapPct)], [400, 440, 9]);
+    eq('the verdict reads the way a coach would say it',
+      verdictFor({ series, biasSide: 'left', sessions: 4 }).text,
+      'Left was 20% behind 4 weeks ago. Now 9% behind. Closing.');
+  }
+
+  // 40. HAND-COMPUTED, exercise two — Copenhagen plank, TIMED and bodyweight,
+  //     bias LEFT. This is the path §4.4's formula would have returned NULL for.
+  //     Week of 2026-06-01: left 30 s, right 45 s -> (45-30)/45 = 33.3% -> 33%
+  //     Week of 2026-06-22: left 40 s, right 45 s -> (45-40)/45 = 11.1% -> 11%
+  {
+    const rows = [
+      { date: '2026-06-01', side: 'left', hold_seconds_done: 30 },
+      { date: '2026-06-01', side: 'right', hold_seconds_done: 45 },
+      { date: '2026-06-03', side: 'left', hold_seconds_done: 28 },
+      { date: '2026-06-03', side: 'right', hold_seconds_done: 45 },
+      { date: '2026-06-22', side: 'left', hold_seconds_done: 40 },
+      { date: '2026-06-22', side: 'right', hold_seconds_done: 45 },
+      { date: '2026-06-24', side: 'left', hold_seconds_done: 38 },
+    ];
+    const series = weeklySeries(rows, 'left');
+    eq('holds are compared as seconds, not silently dropped',
+      [series[0].kind, series[0].left, series[0].right], ['hold', 30, 45]);
+    eq('both weeks compute to the hand-checked gap',
+      [Math.round(series[0].gapPct), Math.round(series[1].gapPct)], [33, 11]);
+    eq('the timed verdict is the same shape as the loaded one',
+      verdictFor({ series, biasSide: 'left', sessions: 4 }).text,
+      'Left was 33% behind 3 weeks ago. Now 11% behind. Closing.');
+  }
+
+  // 41. the verdict the app exists to produce: six weeks of bias that did
+  //     nothing. §4.4 says say so in plain words rather than drawing a line.
+  {
+    const series = [
+      { week: '2026-06-01', gapPct: 20, left: 10, right: 12.5 },
+      { week: '2026-07-13', gapPct: 19, left: 10.5, right: 13 },
+    ];
+    const v = verdictFor({ series, biasSide: 'right', sessions: 8 });
+    eq('a flat gap after six weeks is called out, not charted quietly', v.state, 'stuck');
+    check('and it says what to do about it', /change it/.test(v.text), v.text);
+
+    const widening = verdictFor({
+      series: [{ week: '2026-06-01', gapPct: 12 }, { week: '2026-06-22', gapPct: 20 }],
+      biasSide: 'left', sessions: 6,
+    });
+    eq('a widening gap is named', widening.state, 'widening');
+
+    const flipped = verdictFor({
+      series: [{ week: '2026-06-01', gapPct: 12 }, { week: '2026-06-22', gapPct: -4 }],
+      biasSide: 'left', sessions: 6,
+    });
+    eq('a biased side that overtook reads as words, not a minus sign', flipped.state, 'ahead');
+    check('and says by how much', /ahead by 4%/.test(flipped.text), flipped.text);
+
+    const thin = verdictFor({ series: [{ week: '2026-06-01', gapPct: 20 }], biasSide: 'left', sessions: 2 });
+    eq('under four sessions there is no verdict at all', thin.state, 'thin');
+    check('and it says how far off it is', /2 of 4 sessions/.test(thin.text), thin.text);
+  }
+
+  // 42. chart axes round to numbers a human reads
+  {
+    eq('bounds cover the data', niceBounds([3, 47]).max >= 47, true);
+    check('a flat series still has a drawable range', niceBounds([5, 5]).max > niceBounds([5, 5]).min);
+    eq('an empty series does not produce NaN bounds', niceBounds([]), { min: 0, max: 1 });
   }
 
   // 25. rest countdown is wall-clock, so a throttled/backgrounded app catches up

@@ -191,6 +191,11 @@ export function renderHome(root) {
   }
   root.append(list);
 
+  // ---------- is the gap closing? ----------
+  const progress = el('a', 'btn progresslink', '📉  Is the gap closing?');
+  progress.href = '#/progress';
+  root.append(progress);
+
   // ---------- music ----------
   const music = el('section', 'musicsec');
   root.append(music);

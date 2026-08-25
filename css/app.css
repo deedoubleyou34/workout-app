@@ -560,3 +560,58 @@ html, body {
   background: var(--gold);
 }
 .notice.bad { background: var(--miss); color: #fff; }
+
+/* ---- ducking panel (build 017) ---- */
+.duckbox { margin: 10px 0; }
+.duckbox .escape {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--gold);
+  background: rgba(255, 215, 94, 0.08);
+  color: var(--fg);
+  line-height: 1.4;
+}
+
+/* ---- asymmetry dashboard (build 018, Phase 7) ---- */
+.progresslink {
+  display: block;
+  margin-top: 22px;
+  text-align: center;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+.trendcard { margin-top: 14px; }
+.trendname {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--fg);
+  margin-bottom: 6px;
+}
+.verdict {
+  font-size: 0.92rem;
+  line-height: 1.45;
+  font-weight: 700;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border-left: 3px solid var(--edge);
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 10px;
+}
+.verdict-closing { border-left-color: #5ee08a; color: #9fe9bb; }
+.verdict-level, .verdict-ahead { border-left-color: var(--ki); color: #b6e4ff; }
+.verdict-widening { border-left-color: var(--miss); color: #ffb1a0; }
+.verdict-stuck { border-left-color: var(--orange); color: #ffc9a0; }
+.verdict-flat, .verdict-thin { color: var(--muted); }
+
+/* a chart never scrolls sideways: it scales to the column it is in */
+.chartwrap { width: 100%; overflow: hidden; margin: 6px 0; }
+.chart { width: 100%; height: auto; display: block; }
+.chart-grid { stroke: #2a3350; stroke-width: 1; }
+.chart-tick { fill: #8b93ad; font-size: 9px; font-family: -apple-system, system-ui, sans-serif; }
+.chart-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-line.emphasis { stroke-width: 3; }
+.chart-legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 2px 0 4px; }
+.chart-key { display: inline-flex; align-items: center; gap: 5px; font-size: 0.76rem; color: var(--muted); }
+.chart-key.emphasis { color: var(--fg); font-weight: 700; }
+.chart-key i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.chartunit { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
