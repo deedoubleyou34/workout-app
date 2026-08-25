@@ -92,6 +92,28 @@ Do not scaffold future phases "while you're in there." The gates exist because i
 
 Running record of audit findings and decisions made as phases progress. Newest first. Add an entry whenever a phase surfaces something that changes the plan, the spec, or how we work.
 
+### 2026-08-25 — Music you pick in the app (build 023)
+
+Dom, after using Phase 8: *"the option to choose a playlist for each workout category **or** the option to select an entire album for each category… the freedom to adjust the music directly in the app."* Three limitations behind that, all addressed.
+
+**Albums.** `PUT /me/player/play` has always accepted `spotify:album:…`; only our parser refused it. `parseContext()` now handles playlist, album and artist across share links, `intl-xx` links, URIs and bare ids. An album defaults to **shuffle off** — an album is an ordered thing.
+
+**Per category, not per phase.** The runner has 11 categories and Phase 8 collapsed them to four, so superset C could not differ from superset A. The four phases now carry defaults and any category may override its phase. `sourceFor()` is the single resolution point: override → phase → nothing (leave the music alone). Four decisions to fill in, eleven available.
+
+**Config v2, same `meta` row**, so the mapping still rides along in the `.sqlite` export. `loadConfig` reads **both shapes**: a build-020 flat config maps onto the phases with empty overrides, so a setup made before this build needs nothing redone. That has its own test, because `saveConfig` now writes a shape `loadConfig` must still read from before it existed.
+
+**The picker** (`js/ui/picker.js`) is one component with two call sites — settings and the runner's music sheet. `name` and `type` are stored alongside the URI so settings renders correctly with no network.
+
+**Reachable from every runner screen.** A `♪` button in the top bar opens a sheet, not inline controls: the Done button must never move under his thumb mid-set. A mid-session pick plays immediately and holds until the next category boundary, where `musicFor` sees a different resolved source and switches back. "Temporary" needed no extra state.
+
+**Two live bugs fixed in the rewrite.** `musicPhase` was assigned *before* the switch was attempted, so a failed switch marked the phase done and never retried for the rest of the session. And shuffle was set *after* play, so the first track of every block played unshuffled — it is now set first, in its own `try/catch`, because `PUT /me/player/shuffle` 404s with no active device and a throw there must not skip the play.
+
+**Two things that could not be settled from the PC**, both handled by making the app answer them rather than guessing:
+- The new read scopes (`playlist-read-private`, `playlist-read-collaborative`, `user-library-read`) leave every existing token under-scoped. `hasScope()` detects that from the stored scope string — instant, offline, no 403 needed to discover it.
+- Whether `GET /search` still answers for an app registered after Spotify's 2024-11-27 cutoff. The picker treats a 403 there as "search unavailable", hides the box, says so once and falls back to the library. A **Test search** button on the Music card answers it definitively in one tap.
+
+Suite at **181 cases** plus **61 screen checks**.
+
 ### 2026-08-25 — The screens finally ran somewhere (build 022)
 
 `tools/domstub.mjs` + `tools/verify_screens.mjs`. Every UI module now executes in Node against a real seeded database. Until this existed they had never RUN anywhere: `node --check` proves syntax and `verify_imports.mjs` proves the names exist, but neither catches `step.taget`, a wrong argument order, or a null read — and those are blank screens on Dom's phone, mid-session, during three weeks he cannot redo.
