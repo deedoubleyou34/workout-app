@@ -7,6 +7,7 @@
 
 import * as spotify from '../spotify.js';
 import * as ducking from '../ducking.js';
+import { clearPickerCache } from './picker.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -16,19 +17,23 @@ function el(tag, cls, text) {
 }
 
 // The runner redraws its rest screen on every repaint, so only the newest
-// compact panel is allowed to keep polling.
-let stopPreviousCompact = null;
+// compact panel PER PLACE is allowed to keep polling. Keyed, because the
+// music sheet and the rest screen can be on screen at the same time and one
+// must not silence the other.
+const stopPrevious = new Map();
 
 // container: where to draw. compact: the runner's one-line version.
-export function renderMusic(container, { compact = false } = {}) {
+// key: which compact slot this is ('rest', 'sheet', ...).
+export function renderMusic(container, { compact = false, key = 'default' } = {}) {
   let timer = null;
   let disposed = false;
 
   const root = el('div', 'music' + (compact ? ' music-compact' : ''));
   container.append(root);
   if (compact) {
-    if (stopPreviousCompact) stopPreviousCompact();
-    stopPreviousCompact = () => stop();
+    const previous = stopPrevious.get(key);
+    if (previous) previous();
+    stopPrevious.set(key, () => stop());
   }
 
   const stop = () => {
@@ -212,6 +217,7 @@ export function renderMusic(container, { compact = false } = {}) {
       out.onclick = async () => {
         if (!confirm('Disconnect Spotify? You will need to log in again.')) return;
         await spotify.disconnect();
+        clearPickerCache();      // his library is no longer ours to show
         draw();
       };
       const row = el('div', 'btnrow');

@@ -14,7 +14,16 @@ import { installDom, clearAllTimers } from './domstub.mjs';
 const require = createRequire(import.meta.url);
 const initSqlJs = require('../vendor/sql-wasm.js');
 
-installDom({ root: process.cwd() });
+const { idb } = installDom({ root: process.cwd() });
+// A live token, so the picker's connected path can actually run. spotify.js
+// caches auth on first read, so this has to be in place before the imports.
+idb.set('spotify-auth', {
+  access_token: 'test-token',
+  refresh_token: 'test-refresh',
+  expires_at: Date.now() + 60 * 60 * 1000,
+  scope: 'user-read-playback-state user-modify-playback-state user-read-currently-playing '
+    + 'playlist-read-private playlist-read-collaborative user-library-read',
+});
 globalThis.window.initSqlJs = () => initSqlJs({ locateFile: (f) => 'vendor/' + f });
 
 // modules must be imported AFTER the globals exist
@@ -25,7 +34,8 @@ const { renderDay } = await import('../js/ui/day.js');
 const { renderRun } = await import('../js/ui/run.js');
 const { renderDashboard } = await import('../js/ui/dashboard.js');
 const { renderSettings } = await import('../js/ui/settings.js');
-const { openPicker } = await import('../js/ui/picker.js');
+const { openPicker, clearPickerCache } = await import('../js/ui/picker.js');
+const spotify = await import('../js/spotify.js');
 const { buildSteps, stepTarget } = await import('../js/runner.js');
 const { saveRunnerState } = await import('../js/sessions.js');
 
@@ -123,8 +133,94 @@ const db = getDb();
     }
   }
 
-  // the picker: with no token it must say so rather than reaching for the API
+  // The picker's connected path: the library lists, the debounced search and
+  // the 403 fallback are all new code that only ever runs against Spotify, so
+  // this is the only place they execute at all.
   {
+    const realFetch = globalThis.fetch;
+    let searchStatus = 200;
+    let searchCalls = 0;
+    const api = (url) => {
+      if (url.includes('/me/playlists')) {
+        return { items: [null, { uri: 'spotify:playlist:p1', name: 'Gym Heavy', owner: { display_name: 'Dom' }, tracks: { total: 42 } }] };
+      }
+      if (url.includes('/me/albums')) {
+        return { items: [{ album: { uri: 'spotify:album:a1', name: 'Blackout', artists: [{ name: 'Scorpions' }], total_tracks: 9 } }] };
+      }
+      if (url.includes('/search')) {
+        searchCalls++;
+        return { playlists: { items: [null, { uri: 'spotify:playlist:s1', name: 'Found Mix' }] }, albums: { items: [] } };
+      }
+      return {};
+    };
+    globalThis.fetch = async (input) => {
+      const url = String(typeof input === 'string' ? input : input.url);
+      if (!url.startsWith('http')) return realFetch(input);
+      if (url.includes('/search') && searchStatus !== 200) {
+        return {
+          ok: false, status: searchStatus, headers: { get: () => null },
+          json: async () => ({ error: { status: searchStatus, message: 'Forbidden' } }),
+        };
+      }
+      return { ok: true, status: 200, headers: { get: () => null }, json: async () => api(url) };
+    };
+
+    try {
+      clearPickerCache();
+      let picked = null;
+      const sheet = openPicker({ title: 'Warm-up', onPick: (p) => { picked = p; } });
+      await tick(6);
+      check('the picker lists his own playlists and albums',
+        sheet.textContent.includes('Gym Heavy') && sheet.textContent.includes('Blackout'),
+        sheet.textContent.slice(0, 90));
+      check('a null in Spotify\'s own list does not become a blank row',
+        sheet.querySelectorAll('.pickeritem').length === 2,
+        sheet.querySelectorAll('.pickeritem').length + ' rows');
+      check('an album is labelled as one', sheet.textContent.includes('Scorpions'));
+
+      // picking hands back a source and closes
+      sheet.querySelectorAll('.pickeritem')[0].click();
+      await tick();
+      check('picking returns a playable source',
+        picked && picked.uri === 'spotify:playlist:p1' && picked.type === 'playlist',
+        JSON.stringify(picked));
+      check('and the sheet closes behind it', !globalThis.document.querySelector('.picker'));
+
+      // search: debounced, so it needs a real wait
+      const s2 = openPicker({ title: 'Power', onPick: () => {} });
+      await tick(6);
+      const box = s2.querySelector('.pickersearch').children[0];
+      box.value = 'sledge';
+      box.dispatch('input');
+      await new Promise((r) => setTimeout(r, 500));
+      await tick(6);
+      check('typing runs one debounced search, not one per keystroke', searchCalls === 1,
+        searchCalls + ' calls');
+      check('search results render', s2.textContent.includes('Found Mix'), s2.textContent.slice(0, 90));
+
+      // and if Spotify refuses to let this app search at all
+      searchStatus = 403;
+      const box2 = s2.querySelector('.pickersearch').children[0];
+      box2.value = 'anything';
+      box2.dispatch('input');
+      await new Promise((r) => setTimeout(r, 500));
+      await tick(6);
+      check('a 403 on search hides the box rather than looking broken',
+        !s2.querySelector('.pickersearch'));
+      check('and it falls back to the library with an explanation',
+        s2.textContent.includes('will not let this app search'), s2.textContent.slice(0, 120));
+      s2.remove();
+    } catch (err) {
+      check('the picker works when connected', false, err.message);
+      console.log(String(err.stack).split('\n').slice(1, 4).join('\n'));
+    }
+    globalThis.fetch = realFetch;
+  }
+
+  // ...and with no account at all it must say so rather than reach for the API
+  {
+    await spotify.disconnect();
+    clearPickerCache();
     let reachedApi = false;
     const realFetch = globalThis.fetch;
     globalThis.fetch = async (input) => {
@@ -145,6 +241,7 @@ const db = getDb();
     }
     globalThis.fetch = realFetch;
   }
+
 }
 
 // ---------------------------------------------------------------- the runner

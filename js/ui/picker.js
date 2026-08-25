@@ -124,7 +124,7 @@ export function openPicker({ title = 'Choose music', onPick, onClose } = {}) {
     try {
       if (!cache.playlists) cache.playlists = (await spotify.library.playlists()).items;
       if (!cache.albums) cache.albums = (await spotify.library.albums()).items;
-      note.textContent = '';
+      if (searchAvailable !== false) note.textContent = '';   // keep the "no search" verdict
       note.classList.remove('bad');
       show([['My playlists', cache.playlists], ['My albums', cache.albums]]);
     } catch (err) {
@@ -166,9 +166,12 @@ export function openPicker({ title = 'Choose music', onPick, onClose } = {}) {
         if (err && (err.kind === 'forbidden' || err.status === 403)) {
           searchAvailable = false;
           searchWrap.remove();
-          results.append(el('p', 'musicnote',
-            'Spotify will not let this app search. Your own playlists and albums are listed instead — '
-            + 'anything else can still be added by pasting its link in Settings.'));
+          // The explanation goes in the status line, not the list: loadLibrary
+          // clears the list to redraw it, which would wipe the message that
+          // just explained why the list is all there is.
+          note.textContent = 'Spotify will not let this app search. Your own playlists and albums '
+            + 'are listed instead — anything else can still be added by pasting its link in Settings.';
+          note.classList.remove('bad');
           loadLibrary();
           return;
         }

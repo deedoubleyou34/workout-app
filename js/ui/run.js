@@ -192,7 +192,7 @@ export function renderRun(root, dayNo) {
 
     const holder = el('div', 'sheetmusic');
     sheet.append(holder);
-    renderMusic(holder, { compact: true });
+    renderMusic(holder, { compact: true, key: 'sheet' });
 
     const change = el('button', 'btn btn-primary', 'Change music');
     change.onclick = () => { sheet.remove(); pickMusicNow(); };
@@ -544,7 +544,7 @@ export function renderRun(root, dayNo) {
     // here and nowhere else in the runner.
     const musicBar = el('div', 'runmusic');
     root.append(musicBar);
-    renderMusic(musicBar, { compact: true });
+    renderMusic(musicBar, { compact: true, key: 'rest' });
 
     // wall-clock delta, recomputed every tick — survives iOS throttling
     const paint = () => {

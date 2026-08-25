@@ -6,7 +6,7 @@ import {
   PHASES, PHASE_LABELS, CATEGORIES, categoryLabel, loadConfig, saveConfig,
   parseContext, sourceLabel, explainCategory, defaultShuffle, phaseForCategory,
 } from '../playlists.js';
-import { openPicker } from './picker.js';
+import { openPicker, clearPickerCache } from './picker.js';
 import { today } from '../sessions.js';
 
 // Survives the re-render after every change, so the section does not snap shut
@@ -202,6 +202,7 @@ export function renderSettings(root) {
       + 'Export a .sqlite backup first if you want to keep any of it.')) return;
     if (!confirm('Last check — this really does delete everything you have logged. Continue?')) return;
     const { setsDeleted } = await resetTrainingData({ forgetSpotify: forget.checked });
+    if (forget.checked) clearPickerCache();
     result.textContent = 'Done — ' + setsDeleted + ' logged sets erased. The app is as new.';
     result.classList.remove('bad');
     setTimeout(() => { location.hash = '#/'; }, 1200);

@@ -1,6 +1,6 @@
-# Music, rebuilt — build 023
+# Music, rebuilt — build 024
 
-**Written:** 2026-08-25 · **Live build:** 023
+**Written:** 2026-08-25 · **Live build:** 024
 
 Your other three docs are untouched. This one covers the music change only.
 
@@ -65,4 +65,4 @@ The picker handles either answer on its own: if search 403s it hides the box, sa
 - [ ] Change the music mid-session → it plays → at the next block your saved mapping comes back, and Settings is unchanged.
 - [ ] Point a phase at a playlist, delete that playlist in Spotify, run the session: music keeps playing, nothing stalls.
 
-**Test suite is now 181 cases** plus 61 screen checks. On the phone, expect **ALL 181 TESTS PASSED**.
+**Test suite is now 181 cases** plus 70 screen checks. On the phone, expect **ALL 181 TESTS PASSED**.
