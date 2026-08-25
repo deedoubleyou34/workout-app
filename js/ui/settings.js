@@ -1,9 +1,17 @@
-// Settings — Phase 8's playlist mapping, and the switch that hands the app
+// Settings — what plays when, the backup, and the switch that hands the app
 // over from development to real training.
 
 import { getDb, persist, exportSqliteBlob, resetTrainingData, backupStatus, markBackedUp } from '../db.js';
-import { PHASES, PHASE_LABELS, loadConfig, saveConfig, parsePlaylist, playlistUrl } from '../playlists.js';
+import {
+  PHASES, PHASE_LABELS, CATEGORIES, categoryLabel, loadConfig, saveConfig,
+  parseContext, sourceLabel, explainCategory, defaultShuffle, phaseForCategory,
+} from '../playlists.js';
+import { openPicker } from './picker.js';
 import { today } from '../sessions.js';
+
+// Survives the re-render after every change, so the section does not snap shut
+// while Dom is working through it.
+let overridesOpen = false;
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -32,73 +40,126 @@ export function renderSettings(root) {
   header.append(el('h1', null, 'Settings'));
   root.append(header);
 
-  // ---------- playlists (Phase 8) ----------
   const cfg = loadConfig(db);
-  const card = el('section', 'blockcard');
-  card.append(el('h3', 'cardlabel', 'Music by session phase'));
-  card.append(el('p', 'muted',
-    'Build four playlists in Spotify and paste a link for each. The runner switches '
-    + 'to the right one at each phase boundary. Leave one blank and that phase keeps '
-    + 'whatever was already playing.'));
 
-  const inputs = {};
-  const shuffles = {};
-  for (const phase of PHASES) {
-    const row = el('div', 'phaserow');
-    row.append(el('label', 'phaselabel', PHASE_LABELS[phase]));
-
-    const input = document.createElement('input');
-    input.type = 'url';
-    input.inputMode = 'url';
-    input.placeholder = 'paste a Spotify playlist link';
-    input.autocomplete = 'off';
-    input.setAttribute('autocorrect', 'off');
-    input.setAttribute('spellcheck', 'false');
-    if (cfg[phase].uri) input.value = playlistUrl(cfg[phase].uri) || cfg[phase].uri;
-    inputs[phase] = input;
-    row.append(input);
-
-    const shuffleWrap = el('label', 'shufflewrap');
-    const shuffle = document.createElement('input');
-    shuffle.type = 'checkbox';
-    shuffle.checked = !!cfg[phase].shuffle;
-    shuffles[phase] = shuffle;
-    shuffleWrap.append(shuffle, el('span', null, 'shuffle'));
-    row.append(shuffleWrap);
-
-    const status = el('p', 'musicnote', '');
-    row.append(status);
-    input.addEventListener('input', () => {
-      if (!input.value.trim()) { status.textContent = ''; return; }
-      const uri = parsePlaylist(input.value);
-      status.textContent = uri ? '✓ ' + uri : 'That does not look like a playlist link.';
-      status.classList.toggle('bad', !uri);
-    });
-    card.append(row);
+  // Every change writes immediately. A Save button you can forget is a way to
+  // lose work, and there is nothing here worth batching.
+  async function commit() {
+    saveConfig(db, cfg);
+    await persist();
+    renderSettings(root);
   }
 
-  const saveRow = el('div', 'btnrow');
-  const saveBtn = el('button', 'btn btn-primary', 'Save playlists');
-  const saveNote = el('p', 'musicnote', '');
-  saveBtn.onclick = async () => {
-    const next = {};
-    for (const phase of PHASES) {
-      next[phase] = { uri: inputs[phase].value, shuffle: shuffles[phase].checked };
+  // ---------- music ----------
+  const card = el('section', 'blockcard');
+  card.append(el('h3', 'cardlabel', 'Music'));
+  card.append(el('p', 'muted',
+    'Pick a playlist or a whole album for each part of a session. The runner switches '
+    + 'when the session moves on. Anything left blank keeps whatever is already playing.'));
+
+  // one row, used for both a phase and a category override
+  function sourceRow({ label, source, sub, phase, onChoose, onClear, onShuffle }) {
+    const row = el('div', 'phaserow');
+    row.append(el('label', 'phaselabel', label));
+
+    const current = el('p', 'sourceline' + (source ? '' : ' empty'),
+      source ? sourceLabel(source) : (sub || 'nothing set'));
+    row.append(current);
+
+    const buttons = el('div', 'btnrow');
+    const choose = el('button', 'btn btn-small', source ? 'Change…' : 'Choose…');
+    choose.onclick = () => openPicker({ title: label, onPick: onChoose });
+    buttons.append(choose);
+    if (source) {
+      const clear = el('button', 'btn btn-small', 'Clear');
+      clear.onclick = onClear;
+      buttons.append(clear);
     }
-    const clean = saveConfig(db, next);
-    await persist();
-    const set = PHASES.filter((p) => clean[p].uri).length;
-    saveNote.textContent = set
-      ? 'Saved — ' + set + ' of 4 phases have a playlist.'
-      : 'Saved. No playlists set, so the music never changes on its own.';
-    saveNote.classList.remove('bad');
-  };
-  saveRow.append(saveBtn);
-  card.append(saveRow, saveNote);
+    row.append(buttons);
+
+    if (source && onShuffle) {
+      const wrap = el('label', 'shufflewrap');
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = !!source.shuffle;
+      box.onchange = () => onShuffle(box.checked);
+      wrap.append(box, el('span', null,
+        'shuffle' + (source.type === 'album' && !source.shuffle ? ' (off — album order)' : '')));
+      row.append(wrap);
+    }
+
+    // The paste field stays: it needs no permissions, works offline, and is
+    // the only way to reach something that is not in his library.
+    const paste = document.createElement('input');
+    paste.type = 'url';
+    paste.inputMode = 'url';
+    paste.placeholder = 'or paste a playlist / album link';
+    paste.autocomplete = 'off';
+    paste.setAttribute('autocorrect', 'off');
+    paste.setAttribute('spellcheck', 'false');
+    const pasteNote = el('p', 'musicnote', '');
+    paste.addEventListener('change', () => {
+      const value = paste.value.trim();
+      if (!value) return;
+      const parsed = parseContext(value);
+      if (!parsed) {
+        pasteNote.textContent = 'That is not a playlist or album link.';
+        pasteNote.classList.add('bad');
+        return;
+      }
+      onChoose({ uri: parsed.uri, type: parsed.type, name: null });
+    });
+    row.append(paste, pasteNote);
+    return row;
+  }
+
+  for (const phase of PHASES) {
+    card.append(sourceRow({
+      label: PHASE_LABELS[phase],
+      source: cfg.phases[phase],
+      phase,
+      onChoose: (picked) => {
+        cfg.phases[phase] = { ...picked, shuffle: defaultShuffle(picked.type, phase) };
+        commit();
+      },
+      onClear: () => { cfg.phases[phase] = null; commit(); },
+      onShuffle: (on) => { cfg.phases[phase] = { ...cfg.phases[phase], shuffle: on }; commit(); },
+    }));
+  }
+
+  // ---------- per-category overrides ----------
+  const toggle = el('button', 'btn btn-small', (overridesOpen ? '▾' : '▸') + '  Per-category overrides');
+  toggle.onclick = () => { overridesOpen = !overridesOpen; renderSettings(root); };
+  card.append(toggle);
+
+  if (overridesOpen) {
+    const box = el('div', 'overrides');
+    box.append(el('p', 'muted',
+      'Every category follows its phase unless you set one here. This is where Superset C '
+      + 'gets different music from Superset A.'));
+    for (const key of CATEGORIES) {
+      const explained = explainCategory(key, cfg);
+      const phase = phaseForCategory(key);
+      box.append(sourceRow({
+        label: categoryLabel(key),
+        source: explained.overridden ? cfg.categories[key] : null,
+        sub: explained.text,
+        phase,
+        onChoose: (picked) => {
+          cfg.categories[key] = { ...picked, shuffle: defaultShuffle(picked.type, phase) };
+          commit();
+        },
+        onClear: () => { delete cfg.categories[key]; commit(); },
+        onShuffle: (on) => { cfg.categories[key] = { ...cfg.categories[key], shuffle: on }; commit(); },
+      }));
+    }
+    card.append(box);
+  }
+
   card.append(el('p', 'musicnote',
-    'Playback control needs Spotify Premium, and something must already be playing '
-    + 'on a device for a switch to land. A switch that fails is ignored — the music '
-    + 'you have keeps playing and the session carries on.'));
+    'Playback control needs Spotify Premium, and something must already be playing on a device '
+    + 'for a switch to land. A switch that fails is ignored — the music you have keeps playing '
+    + 'and the session carries on.'));
   root.append(card);
 
   // ---------- backup ----------
@@ -123,7 +184,7 @@ export function renderSettings(root) {
   danger.append(el('p', 'muted',
     'Deletes every session, set, nightly entry, accepted load and suggestion — '
     + 'everything logged while the app was being built. The exercise library, your '
-    + 'day templates and the playlist mapping all stay. This is the button for the '
+    + 'day templates and the music mapping all stay. This is the button for the '
     + 'day real training starts.'));
 
   const forgetWrap = el('label', 'shufflewrap');

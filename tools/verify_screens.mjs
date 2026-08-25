@@ -25,6 +25,7 @@ const { renderDay } = await import('../js/ui/day.js');
 const { renderRun } = await import('../js/ui/run.js');
 const { renderDashboard } = await import('../js/ui/dashboard.js');
 const { renderSettings } = await import('../js/ui/settings.js');
+const { openPicker } = await import('../js/ui/picker.js');
 const { buildSteps, stepTarget } = await import('../js/runner.js');
 const { saveRunnerState } = await import('../js/sessions.js');
 
@@ -100,11 +101,49 @@ const db = getDb();
 
   const settings = await render('settings', (root) => renderSettings(root));
   if (settings) {
-    check('settings renders all four playlist phases',
+    check('settings renders a music row per phase',
       settings.querySelectorAll('.phaserow').length === 4,
       settings.querySelectorAll('.phaserow').length + ' rows');
     check('settings offers the start-fresh button', contains(settings, 'Delete all training data'));
     check('settings offers a backup', contains(settings, 'Export .sqlite'));
+
+    // the per-category overrides open to one row per runner category
+    const toggle = settings.querySelectorAll('.btn-small')
+      .find((b) => b.textContent.includes('Per-category overrides'));
+    check('settings offers per-category overrides', !!toggle);
+    if (toggle) {
+      toggle.click();
+      await tick();
+      const reopened = globalThis.document.body.querySelectorAll('.phaserow').length;
+      check('opening overrides shows all eleven categories plus the four phases',
+        reopened === 15, reopened + ' rows');
+      check('an un-overridden category explains what it follows',
+        globalThis.document.body.textContent.includes('follows Main work'));
+      toggle.click();
+    }
+  }
+
+  // the picker: with no token it must say so rather than reaching for the API
+  {
+    let reachedApi = false;
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (input) => {
+      if (String(input).startsWith('http')) { reachedApi = true; throw new Error('no network in the harness'); }
+      return realFetch(input);
+    };
+    try {
+      const sheet = openPicker({ title: 'Warm-up', onPick: () => {} });
+      await tick();
+      check('the picker opens', !!sheet);
+      check('with no Spotify token it explains itself instead of hanging',
+        sheet.textContent.includes('Not connected'), sheet.textContent.slice(0, 80));
+      check('and it never calls the API when there is nothing to call it with', !reachedApi);
+      sheet.remove();
+    } catch (err) {
+      check('the picker opens', false, err.message);
+      console.log(String(err.stack).split('\n').slice(1, 4).join('\n'));
+    }
+    globalThis.fetch = realFetch;
   }
 }
 
@@ -131,6 +170,20 @@ const db = getDb();
     check('the gate gives way to the session', !root.querySelector('.gatecard'));
     check('the first step is a set, not a rest', !!root.querySelector('.runcard'));
     check('the runner shows the build number', /b\w+/.test(root.textContent));
+
+    // music is reachable from a set screen, not just from a rest
+    const musicBtn = root.querySelector('.musicbtn-top');
+    check('a music button sits on every runner screen', !!musicBtn);
+    if (musicBtn) {
+      const doneBefore = root.querySelector('.donebtn').textContent;
+      musicBtn.click();
+      await tick();
+      const sheet = root.querySelector('.musicsheet');
+      check('it opens a music sheet', !!sheet);
+      check('and the Done button underneath is untouched',
+        root.querySelector('.donebtn').textContent === doneBefore);
+      if (sheet) sheet.remove();
+    }
   }
 
   // walk forward through ~20 steps, pressing whatever the primary button is

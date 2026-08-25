@@ -19,11 +19,26 @@
 import { idbGet, idbPut } from './db.js';
 
 export const CLIENT_ID = 'cf46be5104434a87948db209215d61f7';
-export const SCOPES = [
+// The three player scopes have been here since Phase 5. The three read scopes
+// are new (2026-08-25) and exist only so the in-app picker can list what Dom
+// already has. They are read-only: nothing here ever modifies a playlist or
+// his library.
+//
+// Adding them means every token issued before this build is under-scoped, so
+// browsing prompts for a reconnect. hasScope() below is how that is detected
+// WITHOUT provoking a 403 — it reads the scope string Spotify returned with
+// the token, so it works offline.
+export const SCOPE_LIST = [
   'user-read-playback-state',
   'user-modify-playback-state',
   'user-read-currently-playing',
-].join(' ');
+  'playlist-read-private',
+  'playlist-read-collaborative',
+  'user-library-read',
+];
+export const SCOPES = SCOPE_LIST.join(' ');
+
+export const LIBRARY_SCOPES = ['playlist-read-private', 'user-library-read'];
 
 const AUTH_KEY = 'spotify-auth';       // IndexedDB: tokens, kept out of the .sqlite export
 const PKCE_KEY = 'spotify-pkce';       // localStorage: survives the redirect out and back
@@ -113,6 +128,18 @@ async function saveAuth(next) {
 
 export function isConnected() {
   return !!(auth && auth.refresh_token);
+}
+
+// Does the stored token actually carry this permission? Reading the granted
+// scope string beats calling the endpoint and catching the 403: it is instant,
+// works offline, and lets the UI explain itself before Dom taps anything.
+export function hasScope(scope) {
+  if (!auth || !auth.scope) return false;
+  return String(auth.scope).split(/\s+/).includes(scope);
+}
+
+export function missingLibraryScopes() {
+  return LIBRARY_SCOPES.filter((s) => !hasScope(s));
 }
 
 export async function disconnect() {
@@ -332,6 +359,79 @@ export const player = {
     query: { volume_percent: String(Math.round(percent)), ...(deviceId ? { device_id: deviceId } : {}) },
   }),
 };
+
+// ---------- library and search (read-only) ----------
+//
+// Every one of these is a current endpoint. None of the deprecated set is
+// touched anywhere in this file: no audio-features, audio-analysis,
+// recommendations, related-artists, featured-playlists, category playlists or
+// 30-second previews. They 403 for any app registered after 2024-11-27, and
+// ours was (spec §1.2).
+
+// Spotify's own lists can contain nulls — playlist search is the usual
+// offender — and a null in a render loop is a blank screen.
+const clean = (items) => (items || []).filter(Boolean);
+
+function asSource(item, type) {
+  if (!item || !item.uri) return null;
+  const by = type === 'album' && item.artists
+    ? clean(item.artists).map((a) => a.name).join(', ')
+    : (item.owner && item.owner.display_name) || '';
+  return {
+    uri: item.uri,
+    type,
+    name: item.name,
+    by,
+    tracks: (item.tracks && item.tracks.total) || item.total_tracks || null,
+    image: (clean(item.images)[0] || {}).url || null,
+  };
+}
+
+export const library = {
+  // GET /me/playlists — needs playlist-read-private (and -collaborative for
+  // playlists shared with him).
+  async playlists({ limit = 50, offset = 0 } = {}) {
+    const data = await request('/me/playlists', { query: { limit: String(limit), offset: String(offset) } });
+    return {
+      items: clean(data && data.items).map((i) => asSource(i, 'playlist')).filter(Boolean),
+      next: !!(data && data.next),
+      total: (data && data.total) || 0,
+    };
+  },
+  // GET /me/albums — needs user-library-read. Saved albums arrive wrapped.
+  async albums({ limit = 50, offset = 0 } = {}) {
+    const data = await request('/me/albums', { query: { limit: String(limit), offset: String(offset) } });
+    return {
+      items: clean(data && data.items).map((i) => asSource(i && i.album, 'album')).filter(Boolean),
+      next: !!(data && data.next),
+      total: (data && data.total) || 0,
+    };
+  },
+};
+
+// GET /search — no extra scope. Whether it still answers for apps registered
+// after the 2024 cutoff is the one thing we could not verify from the PC, so
+// the picker treats a 403 here as "search is unavailable" and carries on with
+// the library lists rather than breaking.
+export async function search(q, { types = ['playlist', 'album'], limit = 12 } = {}) {
+  const text = String(q || '').trim();
+  if (!text) return { playlists: [], albums: [] };
+  return parseSearchResults(await request('/search', {
+    query: { q: text, type: types.join(','), limit: String(limit) },
+  }));
+}
+
+// Split out so it can be tested without a network. Search responses are the
+// one place Spotify reliably returns nulls inside items[], and a null reaching
+// a render loop is a blank screen.
+export function parseSearchResults(data) {
+  return {
+    playlists: clean(data && data.playlists && data.playlists.items)
+      .map((i) => asSource(i, 'playlist')).filter(Boolean),
+    albums: clean(data && data.albums && data.albums.items)
+      .map((i) => asSource(i, 'album')).filter(Boolean),
+  };
+}
 
 // "Track — Artist", or null when nothing is playing.
 export function nowPlayingText(state) {

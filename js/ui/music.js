@@ -129,6 +129,44 @@ export function renderMusic(container, { compact = false } = {}) {
         } catch (err) { showError(err); }
       };
 
+      // ---- what Spotify will actually let this app do ----
+      // Two things we cannot know from the PC: whether the stored token has
+      // the read scopes, and whether Spotify still answers /search for an app
+      // registered after its 2024 cutoff. Both are one tap to find out, and
+      // both change what the picker can offer.
+      const access = el('div', 'duckbox');
+      const accessLine = el('p', 'musicnote', '');
+      const missing = spotify.missingLibraryScopes();
+      accessLine.textContent = missing.length
+        ? 'Browsing your library needs a one-time reconnect (missing: ' + missing.join(', ') + ').'
+        : 'Your library is readable — browsing works.';
+      access.append(accessLine);
+      if (missing.length) {
+        const again = el('button', 'btn btn-small', 'Reconnect Spotify');
+        again.onclick = () => spotify.beginLogin();
+        access.append(again);
+      }
+      const searchLine = el('p', 'musicnote', '');
+      const testSearch = el('button', 'btn btn-small', 'Test search');
+      testSearch.onclick = async () => {
+        testSearch.disabled = true;
+        searchLine.textContent = 'Asking Spotify…';
+        searchLine.classList.remove('bad');
+        try {
+          const found = await spotify.search('test');
+          searchLine.textContent = 'Search works — ' + found.playlists.length + ' playlists, '
+            + found.albums.length + ' albums came back.';
+        } catch (err) {
+          searchLine.textContent = 'Search unavailable: ' + (err.message || 'failed')
+            + (err.status === 403 ? ' — the picker will list your own library instead.' : '');
+          searchLine.classList.add('bad');
+        } finally {
+          testSearch.disabled = false;
+        }
+      };
+      access.append(testSearch, searchLine);
+      root.append(access);
+
       // ---- ducking: what cues will do to the music, spec Phase 6 step 5 ----
       const duckBox = el('div', 'duckbox');
       const duckLine = el('p', 'musicnote', 'Cues over music: not checked yet.');

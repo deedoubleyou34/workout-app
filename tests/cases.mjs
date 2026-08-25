@@ -18,8 +18,10 @@ import { pickStrategy, planCycle, canRelease, MIN_CYCLE_MS } from '../js/ducking
 import { capacityOf, bestCapacity, gapPct, weeklySeries,
          verdictFor } from '../js/asymmetry.js';
 import { niceBounds } from '../js/charts.js';
-import { parsePlaylist, playlistUrl, phaseForCategory, defaultConfig,
-         loadConfig, saveConfig, isConfigured, PHASES } from '../js/playlists.js';
+import { parseContext, contextUrl, phaseForCategory, emptyConfig, loadConfig, saveConfig,
+         sourceFor, isConfigured, defaultShuffle, sourceLabel, explainCategory,
+         PHASES, CATEGORIES } from '../js/playlists.js';
+import { parseSearchResults } from '../js/spotify.js';
 
 const EX = {
   slRdl:      { id: 1, name: 'Single-leg RDL (DB)', category: 'strength',   load_type: 'dumbbell',   is_timed: 0, increment_value: 5,  increment_unit: 'lb' },
@@ -693,24 +695,37 @@ export async function run(ctx) {
     eq('an empty series does not produce NaN bounds', niceBounds([]), { min: 0, max: 1 });
   }
 
-  // 43. playlist links: whatever Spotify's share sheet produces has to work,
-  //     because that is the only way Dom will ever enter one
+  // 43. links: whatever Spotify's share sheet produces has to work, because
+  //     that is the only way Dom will ever type one. Albums included now
+  //     (Dom, 2026-08-25) — the API always accepted them, our parser did not.
   {
-    const id = '37i9dQZF1DXcBWIGoYBM5M';
-    eq('a share link parses', parsePlaylist('https://open.spotify.com/playlist/' + id + '?si=abc123'),
-      'spotify:playlist:' + id);
-    eq('a localised share link parses too',
-      parsePlaylist('https://open.spotify.com/intl-de/playlist/' + id), 'spotify:playlist:' + id);
-    eq('a raw URI passes through', parsePlaylist('spotify:playlist:' + id), 'spotify:playlist:' + id);
-    eq('a bare id is accepted', parsePlaylist(id), 'spotify:playlist:' + id);
-    eq('surrounding whitespace from a paste is ignored',
-      parsePlaylist('  spotify:playlist:' + id + '  '), 'spotify:playlist:' + id);
-    check('an album link is not a playlist',
-      parsePlaylist('https://open.spotify.com/album/' + id) === null);
-    check('an empty field is not a playlist', parsePlaylist('') === null);
-    check('nonsense is not a playlist', parsePlaylist('my gym mix') === null);
+    const pl = '37i9dQZF1DXcBWIGoYBM5M';
+    const al = '1ATL5GLyefJaxhQzSPVrLX';
+    eq('a playlist share link parses',
+      parseContext('https://open.spotify.com/playlist/' + pl + '?si=abc123'),
+      { uri: 'spotify:playlist:' + pl, type: 'playlist' });
+    eq('an ALBUM share link parses, and knows it is an album',
+      parseContext('https://open.spotify.com/album/' + al + '?si=abc123'),
+      { uri: 'spotify:album:' + al, type: 'album' });
+    eq('a localised link parses too',
+      parseContext('https://open.spotify.com/intl-de/album/' + al),
+      { uri: 'spotify:album:' + al, type: 'album' });
+    eq('a raw URI passes through',
+      parseContext('spotify:album:' + al), { uri: 'spotify:album:' + al, type: 'album' });
+    eq('an artist link is accepted if pasted',
+      parseContext('spotify:artist:' + al), { uri: 'spotify:artist:' + al, type: 'artist' });
+    eq('a bare id is still assumed to be a playlist',
+      parseContext(pl), { uri: 'spotify:playlist:' + pl, type: 'playlist' });
+    eq('whitespace from a paste is ignored',
+      parseContext('  spotify:playlist:' + pl + '  '), { uri: 'spotify:playlist:' + pl, type: 'playlist' });
+    check('a single track is not a context you can hand to play',
+      parseContext('https://open.spotify.com/track/' + al) === null);
+    check('an empty field is nothing', parseContext('') === null);
+    check('nonsense is nothing', parseContext('my gym mix') === null);
     eq('and a stored URI turns back into a link a human can open',
-      playlistUrl('spotify:playlist:' + id), 'https://open.spotify.com/playlist/' + id);
+      contextUrl('spotify:album:' + al), 'https://open.spotify.com/album/' + al);
+    eq('a source reads as a name and a kind',
+      sourceLabel({ uri: 'spotify:album:' + al, type: 'album', name: 'Blackout' }), 'Blackout — album');
   }
 
   // 44. every runner category maps to one of the four musical phases —
@@ -725,32 +740,104 @@ export async function run(ctx) {
       ['finisher', 'core', 'calves', 'glutes', 'close'].map(phaseForCategory),
       ['finisher', 'finisher', 'finisher', 'finisher', 'finisher']);
     check('a category with no step has no phase', phaseForCategory(null) === null);
-    eq('shuffle is on for main work and off for power (spec Phase 8 step 4)',
-      [defaultConfig().main.shuffle, defaultConfig().power.shuffle], [true, false]);
+    eq('every category the runner can produce is offered in settings',
+      CATEGORIES.length, 11);
+    eq('a playlist shuffles by default, an album does not — an album is ordered',
+      [defaultShuffle('playlist', 'main'), defaultShuffle('album', 'main')], [true, false]);
+    eq('power never shuffles, whatever it is (spec Phase 8 step 4)',
+      [defaultShuffle('playlist', 'power'), defaultShuffle('album', 'power')], [false, false]);
   }
 
-  // 45. the mapping survives a save/load round trip through meta
+  // 45. the mapping survives a save/load round trip, and a setup made by the
+  //     PREVIOUS build still loads — saveConfig writes a shape loadConfig must
+  //     still be able to read from before it existed
   {
     const SQL = await ctx.initSqlJs();
     const db = new SQL.Database();
     db.run(await ctx.loadSchema());
     seed(db);
     check('nothing configured to begin with', !isConfigured(loadConfig(db)));
-    saveConfig(db, {
-      warmup: { uri: 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M?si=x', shuffle: true },
-      main: { uri: 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd', shuffle: true },
-      power: { uri: 'not a playlist', shuffle: false },
-      finisher: { uri: '', shuffle: false },
-    });
+
+    const cfg = emptyConfig();
+    cfg.phases.warmup = { uri: 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M?si=x', name: 'Warm' };
+    cfg.phases.main = { uri: 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd', name: 'Gym Heavy' };
+    cfg.phases.power = { uri: 'spotify:album:1ATL5GLyefJaxhQzSPVrLX', name: 'Blackout', type: 'album' };
+    cfg.phases.finisher = { uri: 'not a link' };
+    cfg.categories['superset 3'] = { uri: 'spotify:album:4LH4d3cOWNNsVw41Gqt2kv', name: 'C only' };
+    saveConfig(db, cfg);
+
     const back = loadConfig(db);
     eq('links are stored canonicalised, not as pasted',
-      back.warmup.uri, 'spotify:playlist:37i9dQZF1DXcBWIGoYBM5M');
-    eq('a URI stays a URI', back.main.uri, 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd');
-    check('an unparseable entry is stored as nothing, not as junk', back.power.uri === null);
-    check('a blank phase stays blank', back.finisher.uri === null);
-    check('and the app now knows it has music to switch to', isConfigured(back));
-    eq('every phase has an entry after a partial save', PHASES.every((p) => p in back), true);
+      back.phases.warmup.uri, 'spotify:playlist:37i9dQZF1DXcBWIGoYBM5M');
+    eq('the name is stored, so settings can show it with no network',
+      back.phases.main.name, 'Gym Heavy');
+    eq('an album keeps its kind and defaults to unshuffled',
+      [back.phases.power.type, back.phases.power.shuffle], ['album', false]);
+    check('an unparseable entry is stored as nothing, not as junk', back.phases.finisher === null);
+    check('and the app knows it has music to switch to', isConfigured(back));
+
+    // resolution: an override wins, everything else inherits its phase
+    eq('a category with an override plays the override',
+      sourceFor('superset 3', back).uri, 'spotify:album:4LH4d3cOWNNsVw41Gqt2kv');
+    eq('a category with no override follows its phase',
+      sourceFor('superset 1', back).uri, 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd');
+    eq('knee work is main work', sourceFor('knee', back).uri, 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd');
+    eq('power has its own', sourceFor('power', back).uri, 'spotify:album:1ATL5GLyefJaxhQzSPVrLX');
+    check('a phase with nothing set resolves to nothing, and the music is left alone',
+      sourceFor('finisher', back) === null);
+    check('and the settings screen can say why',
+      /follows Main work/.test(explainCategory('superset 1', back).text),
+      explainCategory('superset 1', back).text);
+
+    // clearing an override drops it rather than storing a blank
+    delete back.categories['superset 3'];
+    saveConfig(db, back);
+    eq('a cleared override goes back to inheriting',
+      sourceFor('superset 3', loadConfig(db)).uri, 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd');
     db.close();
+  }
+
+  // 45b. a configuration written by build 020 still works after this update.
+  //      Dom set his playlists up before per-category existed; nothing he did
+  //      should need doing again.
+  {
+    const SQL = await ctx.initSqlJs();
+    const db = new SQL.Database();
+    db.run(await ctx.loadSchema());
+    seed(db);
+    // exactly the shape build 020 wrote: flat, four keys, playlists only
+    db.run("INSERT OR REPLACE INTO meta (key, value) VALUES ('playlists', ?)", [JSON.stringify({
+      warmup: { uri: 'spotify:playlist:37i9dQZF1DXcBWIGoYBM5M', shuffle: true },
+      main: { uri: 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd', shuffle: true },
+      power: { uri: null, shuffle: false },
+      finisher: { uri: 'spotify:playlist:37i9dQZF1DX4eRPd9frC1m', shuffle: true },
+    })]);
+    const cfg = loadConfig(db);
+    eq('an old flat config loads into the phases', cfg.phases.warmup.uri,
+      'spotify:playlist:37i9dQZF1DXcBWIGoYBM5M');
+    eq('its shuffle settings survive', cfg.phases.main.shuffle, true);
+    eq('and it starts with no category overrides', Object.keys(cfg.categories).length, 0);
+    eq('so every category resolves exactly as it did before',
+      sourceFor('superset 2', cfg).uri, 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd');
+    // and once re-saved it comes back in the new shape, unchanged in meaning
+    saveConfig(db, cfg);
+    eq('re-saving does not change what plays',
+      sourceFor('superset 2', loadConfig(db)).uri, 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd');
+    db.close();
+  }
+
+  // 45c. Spotify puts nulls inside search results. A null reaching a render
+  //      loop is a blank screen, so they are filtered before the UI sees them.
+  {
+    const parsed = parseSearchResults({
+      playlists: { items: [null, { uri: 'spotify:playlist:a', name: 'Real', owner: { display_name: 'Dom' } }, null] },
+      albums: { items: [{ uri: 'spotify:album:b', name: 'Blackout', artists: [{ name: 'Scorpions' }, null] }] },
+    });
+    eq('nulls are dropped from search results', parsed.playlists.length, 1);
+    eq('the survivor keeps its name', parsed.playlists[0].name, 'Real');
+    eq('an album shows who it is by, nulls and all', parsed.albums[0].by, 'Scorpions');
+    eq('an empty response is empty, not a crash',
+      parseSearchResults({}), { playlists: [], albums: [] });
   }
 
   // 46. starting fresh: everything logged goes, everything describing the
@@ -763,7 +850,9 @@ export async function run(ctx) {
     seed(db);
     db.run("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '6')");
     db.run("INSERT OR REPLACE INTO meta (key, value) VALUES ('runner_state', '{\"index\":4}')");
-    saveConfig(db, { main: { uri: 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd', shuffle: true } });
+    const musicCfg = emptyConfig();
+    musicCfg.phases.main = { uri: 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd', shuffle: true };
+    saveConfig(db, musicCfg);
     db.run("INSERT INTO session (date, day_no, status) VALUES ('2026-08-01', 4, 'complete')");
     const sid = db.exec('SELECT last_insert_rowid()')[0].values[0][0];
     const blockRow = db.exec('SELECT id, exercise_id FROM block LIMIT 1')[0].values[0];
@@ -787,8 +876,8 @@ export async function run(ctx) {
     eq('so are the day templates and blocks', [count('day_template'), count('block') > 0], [5, true]);
     eq('the schema version survives — dropping it would break the next launch',
       db.exec("SELECT value FROM meta WHERE key='schema_version'")[0].values[0][0], '6');
-    eq('the playlist mapping is configuration, not data, and survives',
-      loadConfig(db).main.uri, 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd');
+    eq('the music mapping is configuration, not data, and survives',
+      loadConfig(db).phases.main.uri, 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd');
     check('the runner position does not survive',
       db.exec("SELECT value FROM meta WHERE key='runner_state'").length === 0);
     db.close();

@@ -7,7 +7,8 @@ import * as audio from '../audio.js';
 import { renderMusic } from './music.js';
 import * as ducking from '../ducking.js';
 import * as spotify from '../spotify.js';
-import { phaseForCategory, loadConfig, isConfigured } from '../playlists.js';
+import { sourceFor, loadConfig, isConfigured, sourceLabel } from '../playlists.js';
+import { openPicker } from './picker.js';
 import { progressRing } from '../charts.js';
 
 function el(tag, cls, text) {
@@ -121,29 +122,84 @@ export function renderRun(root, dayNo) {
     musicFor(steps[index]);
   }
 
-  // ---------- music by session phase (Phase 8) ----------
+  // ---------- music (Phase 8, extended 2026-08-25) ----------
+  // Keyed on the RESOLVED source, not on the phase: a per-category override
+  // has to be able to fire, and superset A -> B must not restart the same
+  // playlist from track one when both inherit Main work.
+  //
   // The switch waits for the cue to finish. Fired mid-duck it would start the
-  // new playlist at 25% volume, or — on the pause strategy — start music
-  // straight over the cue that just paused it.
-  const playlists = loadConfig(db);
-  let musicPhase = null;
+  // new music at 25% volume, or — on the pause strategy — start it straight
+  // over the cue that just paused it.
+  const music = loadConfig(db);
+  let musicUri = null;
 
   function musicFor(step) {
-    if (!step || !isConfigured(playlists)) return;
-    const phase = phaseForCategory(step.category);
-    if (!phase || phase === musicPhase) return;
-    const entry = playlists[phase];
-    if (!entry || !entry.uri) return;      // nothing mapped: leave the music alone
-    musicPhase = phase;
+    if (!step || !isConfigured(music)) return;
+    const source = sourceFor(step.category, music);
+    if (!source || !source.uri) return;    // nothing mapped: leave the music alone
+    if (source.uri === musicUri) return;   // already playing, including after a manual pick
+    playSource(source);
+  }
+
+  function playSource(source) {
     ducking.whenClear(async () => {
       try {
-        await spotify.player.play(null, entry.uri);
-        await spotify.player.shuffle(entry.shuffle);
+        // Shuffle FIRST, so the first track is already shuffled. Its own
+        // try/catch: PUT /me/player/shuffle 404s with no active device, and a
+        // throw there must not skip the thing we actually came to do.
+        try { await spotify.player.shuffle(!!source.shuffle); } catch { /* not fatal */ }
+        await spotify.player.play(null, source.uri);
+        // Only now is it true. Recording it before the attempt (as the phase
+        // version did) marks the switch done and never retries after a failure.
+        musicUri = source.uri;
       } catch {
         // spec Phase 8 gate: a failed switch degrades to "music keeps playing",
         // never to a stalled session
       }
     }).catch(() => {});
+  }
+
+  // A pick made mid-session plays now and holds until the next category
+  // boundary, where musicFor sees a different resolved source and switches
+  // back. Nothing is written to settings — that was Dom's call.
+  function pickMusicNow() {
+    openPicker({
+      title: 'Play now',
+      onPick: (picked) => {
+        musicUri = null;                   // force the switch even if it repeats
+        playSource({ ...picked, shuffle: picked.type !== 'album' });
+      },
+    });
+  }
+
+  // The music sheet: reachable from every screen, so changing a track never
+  // means leaving the runner. A sheet rather than inline controls, because the
+  // Done button must never move under his thumb.
+  function openMusicSheet() {
+    document.querySelector('.musicsheet')?.remove();
+    const sheet = el('div', 'sheet musicsheet');
+    const head = el('div', 'pickerhead');
+    head.append(el('h3', null, 'Music'));
+    const close = el('button', 'iconbtn', '✕');
+    close.onclick = () => sheet.remove();
+    head.append(close);
+    sheet.append(head);
+
+    const source = steps[index] ? sourceFor(steps[index].category, music) : null;
+    if (source) {
+      sheet.append(el('p', 'musicnote', 'This block is set to: ' + sourceLabel(source)));
+    }
+
+    const holder = el('div', 'sheetmusic');
+    sheet.append(holder);
+    renderMusic(holder, { compact: true });
+
+    const change = el('button', 'btn btn-primary', 'Change music');
+    change.onclick = () => { sheet.remove(); pickMusicNow(); };
+    sheet.append(change);
+    sheet.append(el('p', 'musicnote',
+      'A change here lasts until the next block. Your saved music is untouched.'));
+    root.append(sheet);
   }
 
   // ---------- voice cues ----------
@@ -260,6 +316,11 @@ export function renderRun(root, dayNo) {
     bar.append(status);
     // duck/restore cycles, so the Phase 6 gate is a number he reads rather
     // than an impression he reports
+    const musicBtn = el('button', 'iconbtn musicbtn-top', '♪');
+    musicBtn.title = 'Music';
+    musicBtn.onclick = openMusicSheet;
+    bar.append(musicBtn);
+
     const duck = ducking.stats();
     if (duck.ducks) {
       bar.append(el('span', 'duckdot' + (duck.failures ? ' lost' : ''),

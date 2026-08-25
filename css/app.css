@@ -681,3 +681,76 @@ html, body {
 }
 .backupcard h2 { font-size: 1rem; color: var(--orange); margin-bottom: 6px; }
 .backupcard p { font-size: 0.85rem; line-height: 1.45; margin-bottom: 10px; }
+
+/* ---- music picker (build 023) ---- */
+.picker, .musicsheet { max-height: 78vh; overflow-y: auto; }
+.pickerhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.pickerhead h3 { font-size: 1rem; }
+.pickersearch input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  background: #0b1020;
+  color: var(--fg);
+  font-size: 0.95rem;
+}
+.pickerlist { margin-top: 8px; }
+.pickergroup {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 12px 0 4px;
+}
+.pickeritem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 10px;
+  margin: 4px 0;
+  text-align: left;
+  border-radius: 10px;
+  border: 1px solid var(--edge);
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+}
+.pickeritem:active { background: #182242; }
+.pickertype { font-size: 1.1rem; color: var(--gold); width: 18px; text-align: center; }
+.pickerbody { display: flex; flex-direction: column; min-width: 0; }
+.pickername {
+  font-weight: 700;
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pickermeta { font-size: 0.75rem; color: var(--muted); }
+
+/* the chosen source, on a settings row */
+.sourceline {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--fg);
+  margin: 2px 0 6px;
+}
+.sourceline.empty { font-weight: 400; color: var(--muted); font-style: italic; }
+.overrides {
+  margin-top: 10px;
+  padding-left: 10px;
+  border-left: 2px solid var(--edge);
+}
+
+/* the runner's music sheet */
+.musicbtn-top { font-size: 1.1rem; }
+.sheetmusic { margin: 6px 0; }
