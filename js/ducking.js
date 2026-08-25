@@ -19,6 +19,25 @@ export const DUCK_LEVEL = 25;        // percent, per spec
 export const MIN_CYCLE_MS = 1500;    // never duck+restore faster than this
 export const TAIL_MS = 400;          // let the cue finish before music returns
 
+// A cue shorter than this plays straight over the music and never touches it.
+//
+// Dom, 2026-08-25: "the music pauses a bit longer before saying go and starts
+// 10 to 15 ms after the word go which is a bit choppy." His device runs the
+// PAUSE strategy, and MIN_CYCLE_MS holds that pause 1.5 s for a ~400 ms word.
+// Stopping and restarting a song around "go" costs more than it buys — the
+// word is short, loud and expected, and it lands fine over music.
+//
+// It is a floor on the CUE, not on the cycle: a real announcement ("Copenhagen
+// plank. Left side. One minute.") runs well past this and still ducks. And the
+// two are not in tension — at the end of a working rest "go" now passes over
+// the top and the set cue ~50 ms behind it opens the one duck of that burst.
+export const MIN_CUE_MS = 900;
+
+// Pure, so the boundary is a test rather than a judgement.
+export function worthDucking(cueMs, min = MIN_CUE_MS) {
+  return Number.isFinite(cueMs) && cueMs >= min;
+}
+
 const CACHE_KEY = 'duck-strategies'; // { [deviceId]: { strategy, at } }
 const STRANDED_KEY = 'duck-stranded';
 
@@ -252,6 +271,9 @@ function scheduleRelease() {
 export async function speakOver(playFn) {
   const ms = await playFn();
   if (!ms) return ms;
+  // Too short to be worth interrupting the music for. It still plays — it just
+  // plays over the top.
+  if (!worthDucking(ms)) return ms;
   // The runner fires begin() without waiting so the session starts instantly.
   // Without this, the very first cue of every session — the first thing Dom
   // hears — would play over full-volume music because the probe had not

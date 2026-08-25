@@ -49,6 +49,16 @@ export const MIGRATIONS = [
       reseedAndRemap(db);
     },
   },
+  {
+    // v6 (build 025): warm-up rests go 5 s -> 15 s (Dom, 2026-08-25). The value
+    // lives on block.rest_seconds_after in the seed, so an existing database
+    // would otherwise keep 5 s forever while a fresh install got 15. Same shape
+    // as v4/v5: rebuild the library, remap the logged sets onto the new blocks.
+    version: 6,
+    run(db) {
+      reseedAndRemap(db);
+    },
+  },
 ];
 // MIGRATIONS must stay in ascending version order — they are applied in array
 // order and each one bumps the stored version, so an out-of-order entry would

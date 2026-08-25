@@ -542,10 +542,12 @@ html, body {
 .musicnote.bad { color: var(--miss); }
 .musicdevices { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 
-/* the runner's rest-screen strip: smaller, out of the way of the clock */
-.runmusic { margin-top: 14px; }
-.music-compact .nowplaying { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
-.music-compact .musicbtn { min-height: 40px; font-size: 1rem; }
+/* The runner's rest-screen strip. It sits ABOVE the clock (Dom, 2026-08-25),
+   so nothing here can be under his thumb when the Go button appears. Controls
+   are 15% bigger than they were, which is what he asked for. */
+.runmusic { margin: 2px 0 10px; }
+.music-compact .nowplaying { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+.music-compact .musicbtn { min-height: 46px; font-size: 1.15rem; }
 .music-compact .musicnote { font-size: 0.72rem; }
 
 /* one-shot banner for the OAuth round trip */

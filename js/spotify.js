@@ -334,8 +334,70 @@ async function request(path, { method = 'GET', body = null, query = null, retry 
   return null;
 }
 
+// ---------- waking a device back up ----------
+//
+// Dom, 2026-08-25: after a force-quit he reopened the app and "it doesn't allow
+// me to start spotify where it left off unless I start playing music on a
+// device that has spotify."
+//
+// That is Spotify's own behaviour, not a bug here: it drops the ACTIVE device
+// after a spell of inactivity, and every /me/player command then 404s with
+// NO_ACTIVE_DEVICE. There is no endpoint that says "resume on whatever was
+// last playing" — but PUT /me/player (transfer) will hand playback to a device
+// that is merely awake, which is what the phone's Spotify app is.
+//
+// So the last device this app saw playing is remembered, and wake() puts
+// playback back on it: that one, if it is still listed; otherwise whatever is.
+const LAST_DEVICE_KEY = 'spotify-last-device';
+let lastDevice = null;
+
+export function rememberDevice(device) {
+  if (!device || !device.id) return;
+  if (lastDevice && lastDevice.id === device.id) return;
+  lastDevice = { id: device.id, name: device.name || 'your last device' };
+  idbPut(LAST_DEVICE_KEY, lastDevice).catch(() => {});
+}
+
+export async function lastKnownDevice() {
+  if (lastDevice) return lastDevice;
+  lastDevice = (await idbGet(LAST_DEVICE_KEY)) || null;
+  return lastDevice;
+}
+
+// Returns the device playback landed on, or null if there was nothing to wake.
+// Throws only what the transfer itself threw.
+export async function wake() {
+  const list = await player.devices();
+  if (!list.length) return null;
+  const remembered = await lastKnownDevice();
+  const target = (remembered && list.find((d) => d.id === remembered.id))
+    || list.find((d) => d.is_active) || list[0];
+  if (!target) return null;
+  await player.transfer(target.id);
+  rememberDevice(target);
+  return target;
+}
+
+// Run a playback command, and if Spotify says there is no active device, wake
+// one and try exactly once more. One retry, never a loop: if the second
+// attempt fails there is nothing awake to talk to and the caller's error line
+// is the honest answer.
+export async function withDevice(fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    if (!err || err.kind !== 'no_device') throw err;
+    const woken = await wake();
+    if (!woken) throw err;
+    return fn();
+  }
+}
+
 export const player = {
-  state: () => request('/me/player'),
+  state: () => request('/me/player').then((st) => {
+    if (st && st.device) rememberDevice(st.device);
+    return st;
+  }),
   devices: () => request('/me/player/devices').then((d) => (d && d.devices) || []),
   // With no contextUri this sends NO body, which resumes whatever was playing.
   // Passing a body with a context_uri would restart a playlist from track one,

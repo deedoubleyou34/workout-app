@@ -28,7 +28,7 @@ AUDIO = ROOT / "audio"
 CUES = AUDIO / "cues.json"
 
 VOICE = "en-US-AndrewNeural"   # clear, level, not breathy; good over gym noise
-RATE = "+18%"                  # brisk: Dom found +8% lagged the rest clock
+RATE = "+24%"                  # Dom, 2026-08-25: +18% still read slow. +8% lagged the rest clock.
 
 
 async def render(clip_id: str, text: str, force: bool) -> tuple[str, int]:

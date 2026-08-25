@@ -16,7 +16,7 @@
 // AudioBuffers and scheduled back to back on one AudioContext that stays open
 // for the whole session.
 
-import { cueId, setText, restText, hasSecondsClip, slug } from './cues.js';
+import { cueId, setText, restText, restIsSilent, hasSecondsClip, slug } from './cues.js';
 
 let ctx = null;
 let manifest = null;
@@ -183,7 +183,7 @@ export function announceSet(step) {
 
 export function announceRest(seconds, opts = {}) {
   const text = restText(seconds, opts);
-  if (!text) return [];                       // a five-second gap says nothing
+  if (!text) return [];                       // a warm-up gap says nothing
   const id = cueId(text);
   if (hasClip(id)) return [id];
   const q = [opts.main ? 's_main_rest' : 's_rest'];
@@ -196,7 +196,11 @@ export function announceRest(seconds, opts = {}) {
 export function cueIdsFor(step) {
   if (step.kind === 'set') return [...new Set([...announceSet(step), ...piecewiseSet(step)])];
   if (step.kind === 'rest') {
-    const id = cueId(restText(step.seconds, { main: step.main, nextCategory: step.nextCategory }));
+    const opts = { main: step.main, nextCategory: step.nextCategory, category: step.category };
+    // A silent rest asks for no clips at all — preloading the fallback pieces
+    // for one would be decoding audio the session can never reach.
+    if (restIsSilent(step.seconds, opts)) return [];
+    const id = cueId(restText(step.seconds, opts));
     return [id, 's_rest', 's_main_rest', 'sec_' + step.seconds].filter(Boolean);
   }
   return [];

@@ -45,10 +45,11 @@ export function categoryLabel(key) {
   return CATEGORY_LABELS[key] || key;
 }
 
-// Warm-up drills rest 5 s between each (Dom, 2026-08-24), but the break before
-// the first working block is a real one — otherwise the warm-up runs straight
-// into the knee work. Only the warm-up gets a floor; every other category's
-// main rest is exactly what its blocks prescribe.
+// Warm-up drills rest 15 s between each (Dom, 2026-08-25 — 5 s was too tight to
+// get set up), and those gaps are SILENT: see restIsSilent() in js/cues.js. The
+// break before the first working block is a real one — otherwise the warm-up
+// runs straight into the knee work. Only the warm-up gets a floor; every other
+// category's main rest is exactly what its blocks prescribe.
 export const MAIN_REST_FLOOR = { warmup: 45 };
 
 // Rounds for one superset group / solo block: sets alternate a -> b -> rest.

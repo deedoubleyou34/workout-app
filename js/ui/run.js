@@ -10,6 +10,7 @@ import * as spotify from '../spotify.js';
 import { sourceFor, loadConfig, isConfigured, sourceLabel } from '../playlists.js';
 import { openPicker } from './picker.js';
 import { progressRing } from '../charts.js';
+import { restIsSilent } from '../cues.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -148,7 +149,10 @@ export function renderRun(root, dayNo) {
         // try/catch: PUT /me/player/shuffle 404s with no active device, and a
         // throw there must not skip the thing we actually came to do.
         try { await spotify.player.shuffle(!!source.shuffle); } catch { /* not fatal */ }
-        await spotify.player.play(null, source.uri);
+        // withDevice: a phase boundary reached after the app was backgrounded
+        // for a while often finds no active device. Wake the last one rather
+        // than silently skipping the switch.
+        await spotify.withDevice(() => spotify.player.play(null, source.uri));
         // Only now is it true. Recording it before the attempt (as the phase
         // version did) marks the switch done and never retries after a failure.
         musicUri = source.uri;
@@ -211,7 +215,8 @@ export function renderRun(root, dayNo) {
         setIndex: step.setIndex, totalSets: step.totalSets,
       }));
     } else if (step.kind === 'rest') {
-      say(audio.announceRest(step.seconds, { main: step.main }));
+      say(audio.announceRest(step.seconds,
+        { main: step.main, nextCategory: step.nextCategory, category: step.category }));
     } else if (step.kind === 'summary') {
       say(audio.CUE_COMPLETE);
     }
@@ -519,6 +524,15 @@ export function renderRun(root, dayNo) {
 
   function drawRest(step) {
     if (!restStartedAt) { restStartedAt = Date.now(); save(); }
+
+    // Rest is the only sane moment to touch the music, so the controls appear
+    // here and nowhere else in the runner. ABOVE the clock, not under the Go
+    // button (Dom, 2026-08-25) — under it they sat where his thumb lands when
+    // the rest ends, and he was hitting skip-track instead of Go.
+    const musicBar = el('div', 'runmusic');
+    root.append(musicBar);
+    renderMusic(musicBar, { compact: true, key: 'rest' });
+
     const card = el('section', 'runcard restcard' + (step.main ? ' mainrest' : ''));
     card.append(el('div', 'runside', step.main ? 'MAIN REST' : 'REST'));
     const dial = el('div', 'dial');
@@ -540,11 +554,7 @@ export function renderRun(root, dayNo) {
     skip.onclick = () => go(index + 1);
     root.append(skip);
 
-    // Rest is the only sane moment to touch the music, so the controls appear
-    // here and nowhere else in the runner.
-    const musicBar = el('div', 'runmusic');
-    root.append(musicBar);
-    renderMusic(musicBar, { compact: true, key: 'rest' });
+    const silent = restIsSilent(step.seconds, { main: step.main, category: step.category });
 
     // wall-clock delta, recomputed every tick — survives iOS throttling
     const paint = () => {
@@ -552,8 +562,11 @@ export function renderRun(root, dayNo) {
       clock.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
       clock.classList.toggle('done', left === 0);
       ring.update(step.seconds ? left / step.seconds : 0);
-      // keyed to this rest, so coming back to the app late does not replay it
-      if (left <= 10 && left > 0 && warnedAt !== restStartedAt && step.seconds > 12) {
+      // keyed to this rest, so coming back to the app late does not replay it.
+      // A silent rest gets no ten-second warning either: at 15 s the warning
+      // would land three seconds in and be the only thing said in a gap Dom
+      // asked to be quiet.
+      if (left <= 10 && left > 0 && warnedAt !== restStartedAt && step.seconds > 12 && !silent) {
         warnedAt = restStartedAt;
         say(audio.CUE_TEN_SECONDS);
       }

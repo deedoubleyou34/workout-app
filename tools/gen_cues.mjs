@@ -45,7 +45,8 @@ for (const day of all('SELECT * FROM day_template ORDER BY day_no')) {
       const t = stepTarget(step);
       text = setText({ name: step.label, side: step.side, targetKind: t.kind, targetValue: t.value });
     } else if (step.kind === 'rest') {
-      text = restText(step.seconds, { main: step.main, nextCategory: step.nextCategory });
+      text = restText(step.seconds,
+        { main: step.main, nextCategory: step.nextCategory, category: step.category });
     }
     const id = cueId(text);
     if (id && !(id in clips)) { clips[id] = text; composites++; }

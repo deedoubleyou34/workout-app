@@ -11,10 +11,10 @@ import { seed } from '../js/seed.js';
 import { nextDayUp, startOver, currentSession, finishSession } from '../js/sessions.js';
 import { buildSteps, remainingSeconds, resumeIndex, progressOf, stepTarget, isTimedStep,
          MAIN_REST_FLOOR } from '../js/runner.js';
-import { setText, restText, cueId, spokenSeconds, hasSecondsClip } from '../js/cues.js';
+import { setText, restText, restIsSilent, cueId, spokenSeconds, hasSecondsClip } from '../js/cues.js';
 import { needsRefresh, callbackParams, retryAfterMs, describeError,
          nowPlayingText } from '../js/spotify.js';
-import { pickStrategy, planCycle, canRelease, MIN_CYCLE_MS } from '../js/ducking.js';
+import { pickStrategy, planCycle, canRelease, worthDucking, MIN_CYCLE_MS, MIN_CUE_MS } from '../js/ducking.js';
 import { capacityOf, bestCapacity, gapPct, weeklySeries,
          verdictFor } from '../js/asymmetry.js';
 import { niceBounds } from '../js/charts.js';
@@ -421,21 +421,37 @@ export async function run(ctx) {
     eq('progress counts logged sets only', progressOf(steps, i), { done: 2, total: 4 });
   }
 
-  // 26. warm-up drills rest 5 s between each, but the break before the first
-  //     working block is a real one (Dom, 2026-08-24)
+  // 26. warm-up drills rest 15 s between each (Dom, 2026-08-25 — 5 s was too
+  //     tight to get set up), but the break before the first working block is
+  //     still a real one
   {
     const steps = buildSteps([
-      blk({ id: 1, code: 'warmup', name: 'Leg swings', rest: 5,
+      blk({ id: 1, code: 'warmup', name: 'Leg swings', rest: 15,
         targets: [{ side: 'both', sets: 2, reps: 12 }] }),
       blk({ id: 2, code: 'knee', name: 'ATG split squat', rest: 45,
         targets: [{ side: 'both', sets: 2, reps: 8 }] }),
     ]);
     const rests = steps.filter((s) => s.kind === 'rest');
-    // 5 s inside the warm-up, then the 45 s main rest at the boundary, then
+    // 15 s inside the warm-up, then the 45 s main rest at the boundary, then
     // the knee block's own 45 s between its rounds
-    eq('a five-second gap between warm-up drills, 45 s before the work',
-      rests.map((r) => [r.seconds, !!r.main]), [[5, false], [45, true], [45, false]]);
+    eq('a fifteen-second gap between warm-up drills, 45 s before the work',
+      rests.map((r) => [r.seconds, !!r.main]), [[15, false], [45, true], [45, false]]);
     eq('only the warm-up carries a main-rest floor', MAIN_REST_FLOOR, { warmup: 45 });
+    eq('every warm-up rest still carries its category, which is what silences it',
+      rests.filter((r) => !r.main).map((r) => r.category), ['warmup', 'knee']);
+  }
+
+  // 26b. the seed actually carries 15 s, not just the synthetic block above —
+  //      this is the value a migration has to reach on Dom's phone
+  {
+    const SQL = await ctx.initSqlJs();
+    const db = new SQL.Database();
+    db.run(await ctx.loadSchema());
+    seed(db);
+    const warmupRests = db.exec(
+      "SELECT DISTINCT rest_seconds_after FROM block WHERE block_code = 'warmup' ORDER BY 1");
+    eq('every seeded warm-up block rests 15 s', warmupRests[0].values.map((v) => v[0]), [15]);
+    db.close();
   }
 
   // 27. sled work: sets and weight, no counted target (Dom, 2026-08-24)
@@ -472,7 +488,18 @@ export async function run(ctx) {
     eq('a sled set announces the exercise and nothing it cannot count',
       setText({ name: 'Heavy sled push', side: 'both', targetKind: 'effort', targetValue: null }),
       'Heavy sled push.');
-    check('a five-second warm-up gap is not announced at all', restText(5) === null);
+    check('a five-second gap is not announced at all', restText(5) === null);
+    // Dom, 2026-08-25: 15 s warm-up gaps, silent, with only "go" at the end.
+    // The old rule was `seconds < 10`, so at 15 s these would have STARTED
+    // talking — the category is what keeps them quiet.
+    check('a fifteen-second warm-up gap says nothing',
+      restText(15, { category: 'warmup' }) === null);
+    eq('the same fifteen seconds anywhere else is still announced',
+      restText(15, { category: 'knee' }), '15 seconds rest.');
+    check('the main rest at the end of the warm-up still speaks',
+      restIsSilent(45, { main: true, category: 'warmup' }) === false);
+    check('and a warm-up gap of any length is silent',
+      restIsSilent(30, { category: 'warmup' }) && restIsSilent(15, { category: 'warmup' }));
     eq('the main rest names what is coming next',
       restText(90, { main: true, nextCategory: 'Superset A' }),
       'Main rest. A minute thirty. Next up, Superset A.');
@@ -571,6 +598,18 @@ export async function run(ctx) {
     const long = planCycle({ ducked: false }, t, 4000);
     check('a four-second cue is not cut off at 1.5 s', long.releaseAt >= t + 4000);
     check('nothing releases a cycle that was never ducked', !canRelease({ ducked: false }, t + 99999));
+  }
+
+  // 36b. a cue too short to be worth stopping the music for (Dom, 2026-08-25:
+  //      "the music pauses a bit longer before saying go ... which is a bit
+  //      choppy"). "go" renders at ~580 ms; a real announcement is 1.8 s+.
+  {
+    check('"go" alone never touches the music', !worthDucking(580));
+    check('a whole-sentence set cue still does', worthDucking(2736));
+    check('the boundary is inclusive', worthDucking(MIN_CUE_MS));
+    check('a silent session does not duck either', !worthDucking(0));
+    check('a cue length that is not a number is never ducked for',
+      !worthDucking(undefined) && !worthDucking(NaN));
   }
 
   // 37. capacity: §4.4 says MAX(weight_lb * reps_done), which is NULL for the

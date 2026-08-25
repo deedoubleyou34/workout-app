@@ -78,7 +78,11 @@ export function renderMusic(container, { compact = false, key = 'default' } = {}
       b.onclick = async () => {
         b.disabled = true;
         try {
-          await fn();
+          // Spotify drops the active device after a while idle — commonest
+          // after a force-quit. withDevice hands playback back to the last
+          // device we saw and retries once, so a control press works instead
+          // of telling him to go open Spotify first.
+          await spotify.withDevice(fn);
           note.textContent = '';
           // Spotify's own state lags its commands by a moment
           setTimeout(() => { if (alive()) refresh(); }, 500);
@@ -110,8 +114,22 @@ export function renderMusic(container, { compact = false, key = 'default' } = {}
       root.append(devices);
 
       const pick = el('button', 'btn btn-small', 'Devices…');
+      // A second tap closes the list (Dom, 2026-08-25: it opened but never
+      // dropped back down). `open` is tracked rather than inferred from
+      // childNodes, because the "no devices" branch also leaves a child behind
+      // and that state has to close on the next tap too.
+      let devicesOpen = false;
       pick.onclick = async () => {
         devices.innerHTML = '';
+        if (devicesOpen) {
+          devicesOpen = false;
+          pick.textContent = 'Devices…';
+          pick.classList.remove('btn-primary');
+          return;
+        }
+        devicesOpen = true;
+        pick.textContent = 'Devices ▴';
+        pick.classList.add('btn-primary');
         try {
           const list = await spotify.player.devices();
           if (!list.length) {

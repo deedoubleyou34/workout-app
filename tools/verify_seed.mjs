@@ -204,7 +204,10 @@ check('nightly holds: only left-calf 90s and closing couch 120s exceed 60s', all
           const t = stepTarget(step);
           text = setText({ name: step.label, side: step.side, targetKind: t.kind, targetValue: t.value });
         } else if (step.kind === 'rest') {
-          text = restText(step.seconds, { main: step.main, nextCategory: step.nextCategory });
+          // category matters: a warm-up gap is silent, so it has no clip and
+          // must not be counted as one that is missing (js/cues.js).
+          text = restText(step.seconds,
+            { main: step.main, nextCategory: step.nextCategory, category: step.category });
         }
         const id = cueId(text);
         if (id && !manifest[id]) missingSentences.push(text);

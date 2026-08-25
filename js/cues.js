@@ -97,14 +97,30 @@ export function setText({ name, side, targetKind, targetValue }) {
   return sentence([spokenName(name), SIDE_PHRASE[side], targetPhrase(targetKind, targetValue)]);
 }
 
+// Which rests say nothing at all.
+//
+// Dom, 2026-08-25: "Rest after each exercise increase to 15s instead of 5s but
+// turn off voice cue since I have to hit button after when they say 'go', so
+// only keep go after 15s." So a warm-up gap is silent for its whole 15 s and
+// the only word in it is the "go" the runner fires when the clock hits zero.
+// That is a property of the CATEGORY, not of the length — at 15 s the old
+// `seconds < 10` rule would have started announcing them.
+//
+// The main rest at the end of the warm-up is a different thing (45 s, and it
+// names what is coming next), so `main` wins over the category.
+export function restIsSilent(seconds, { main = false, category = null } = {}) {
+  if (main) return false;
+  if (category === 'warmup') return true;
+  return seconds < 10;
+}
+
 // Short rests lead with the number — it is the only thing worth hearing.
-// A five-second gap between warm-up drills is not worth announcing at all.
-export function restText(seconds, { main = false, nextCategory = null } = {}) {
+export function restText(seconds, { main = false, nextCategory = null, category = null } = {}) {
   if (main) {
     const next = nextCategory ? nextCategory.replace(/\s*\/\s*/g, ' and ') : null;
     return sentence(['Main rest', spokenSeconds(seconds), next ? 'next up, ' + next : null]);
   }
-  if (seconds < 10) return null;
+  if (restIsSilent(seconds, { main, category })) return null;
   // A short rest is a number, not a phrase: "90 seconds rest", not "a minute
   // thirty rest". Whole minutes still read as minutes.
   const said = seconds % 60 === 0 ? spokenSeconds(seconds) : seconds + ' seconds';
