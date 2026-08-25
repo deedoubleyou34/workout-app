@@ -8,7 +8,8 @@
 import { ruleFor, isSessionHit, trailingStreak, evaluate,
          computeFlags, acceptFlag, acceptAll, declineFlag, snoozeFlag, pendingFlags } from '../js/progression.js';
 import { seed } from '../js/seed.js';
-import { nextDayUp, startOver, currentSession, finishSession } from '../js/sessions.js';
+import { nextDayUp, startOver, currentSession, finishSession, startSession, logSet,
+         saveRunnerState, resumableSession } from '../js/sessions.js';
 import { buildSteps, remainingSeconds, resumeIndex, progressOf, stepTarget, isTimedStep,
          MAIN_REST_FLOOR } from '../js/runner.js';
 import { setText, restText, restIsSilent, cueId, spokenSeconds, hasSecondsClip } from '../js/cues.js';
@@ -18,6 +19,7 @@ import { pickStrategy, planCycle, canRelease, worthDucking, MIN_CYCLE_MS, MIN_CU
 import { capacityOf, bestCapacity, gapPct, weeklySeries,
          verdictFor } from '../js/asymmetry.js';
 import { niceBounds } from '../js/charts.js';
+import { powerParts, powerFrom, tierFor, tierGoalText, TIERS, WEIGHTS } from '../js/power.js';
 import { parseContext, contextUrl, phaseForCategory, emptyConfig, loadConfig, saveConfig,
          sourceFor, isConfigured, defaultShuffle, sourceLabel, explainCategory,
          PHASES, CATEGORIES } from '../js/playlists.js';
@@ -919,6 +921,93 @@ export async function run(ctx) {
       loadConfig(db).phases.main.uri, 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd');
     check('the runner position does not survive',
       db.exec("SELECT value FROM meta WHERE key='runner_state'").length === 0);
+    db.close();
+  }
+
+  // 24b. the power level as a goal tracker (Dom, 2026-08-25)
+  {
+    // The legend has to add up to the number, or it is explaining a different
+    // score from the one on screen.
+    const counts = { sets: 79, reps: 689, holds: 825, tonnage: 12000, nights: 3 };
+    const parts = powerParts(counts);
+    eq('the legend adds up to the power level',
+      Math.round(parts.reduce((n, p) => n + p.points, 0)), powerFrom(counts));
+    eq('the legend has a line per contributor, in a fixed order',
+      parts.map((p) => p.key), ['sets', 'reps', 'holds', 'tonnage', 'nights']);
+    eq('the weights are the ones the score has always used',
+      [WEIGHTS.sets, WEIGHTS.reps, WEIGHTS.holdSeconds, WEIGHTS.nights], [100, 10, 5, 50]);
+    eq('an empty week is zero, not NaN', powerFrom({}), 0);
+    eq('and its legend still draws every row', powerParts({}).length, 5);
+
+    // The ladder: thresholds must climb, and every step must cost more than the
+    // one before it — that is the shape kept from the source material.
+    check('the forms are in ascending order',
+      TIERS.every((t, i) => i === 0 || t.at > TIERS[i - 1].at),
+      TIERS.map((t) => t.at).join(', '));
+    const gaps = TIERS.slice(1).map((t, i) => t.at - TIERS[i].at);
+    check('each form costs more work than the last',
+      gaps.every((g, i) => i === 0 || g >= gaps[i - 1]), gaps.join(', '));
+    check('every form carries a colour for the screen to take',
+      TIERS.every((t) => /^#[0-9a-f]{6}$/i.test(t.accent)));
+
+    // Anchored to what Dom's program actually scores (js/seed.js): one training
+    // day is ~19,000 and all four are ~74,000. If the seed's volume ever
+    // changes enough to break these, the ladder needs re-tuning with it.
+    eq('a brand-new week is Base', tierFor(0).tier.key, 'base');
+    eq('one complete training day is Super Saiyan', tierFor(19000).tier.key, 'ssj');
+    eq('the whole four-day program is Super Saiyan God', tierFor(74000).tier.key, 'ssg');
+    eq('nothing sits above Ultra Instinct', tierFor(9_000_000).next, null);
+    check('and the top form does not divide by a zero span',
+      tierFor(9_000_000).progressPct === 100);
+
+    eq('the goal line says what the next form costs',
+      tierGoalText(0), '5,000 more to Kaio-ken.');
+    check('progress through a gap is a percentage of that gap, not of the total',
+      Math.round(tierFor(11500).progressPct) === 50, String(tierFor(11500).progressPct));
+    eq('a negative or missing score never falls off the bottom',
+      [tierFor(-5).tier.key, tierFor(undefined).tier.key], ['base', 'base']);
+  }
+
+  // 24c. resume only a session with work actually in it (Dom, 2026-08-25:
+  //      "not a session that was only viewed"). The runner opens a session on
+  //      entry, so in_progress alone is not the test.
+  {
+    const SQL = await ctx.initSqlJs();
+    const db = new SQL.Database();
+    db.run(await ctx.loadSchema());
+    seed(db);
+
+    check('nothing to resume on a fresh database', resumableSession(db) === null);
+
+    const viewed = startSession(db, 1);
+    check('a day that was only opened is not offered as resumable',
+      resumableSession(db) === null, JSON.stringify(resumableSession(db)));
+
+    // The runner parked at step 0 is still "only opened" — that is where it
+    // starts, so it says nothing about whether any work happened.
+    saveRunnerState(db, { session_id: viewed.id, index: 0, restStartedAt: null, hold: null });
+    check('and neither is one parked at the very first step',
+      resumableSession(db) === null);
+
+    saveRunnerState(db, { session_id: viewed.id, index: 7, restStartedAt: null, hold: null });
+    const parked = resumableSession(db);
+    eq('a runner parked past the first step is live work', parked && parked.day_no, 1);
+
+    // A logged set is the other way in, and it does not need runner state.
+    const block = db.exec("SELECT b.id, b.exercise_id FROM block b JOIN day_template d " +
+      'ON d.id = b.day_template_id WHERE d.day_no = 2 LIMIT 1')[0].values[0];
+    const worked = startSession(db, 2);
+    db.run("DELETE FROM meta WHERE key = 'runner_state'");
+    logSet(db, { session_id: worked.id, block_id: block[0], exercise_id: block[1],
+      side: 'left', set_index: 1, reps_done: 10, target_reps: 10, hit_target: 1 });
+    const live = resumableSession(db);
+    eq('a session with a logged set is resumable with no runner state at all',
+      [live && live.day_no, live && live.sets], [2, 1]);
+    check('and it carries the day name for the card', !!(live && live.name));
+
+    finishSession(db, worked.id);
+    check('a finished session is never offered as resumable',
+      (resumableSession(db) || {}).day_no !== 2);
     db.close();
   }
 

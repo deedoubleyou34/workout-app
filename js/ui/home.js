@@ -1,8 +1,10 @@
 import { query, storageStatus, exportSqliteBlob, exportJsonBlob, exportCsvBlob, importBytes,
          getDb, persist, backupStatus, markBackedUp } from '../db.js';
 import { pendingFlags, acceptFlag, acceptAll, declineFlag, snoozeFlag, isSessionHit } from '../progression.js';
-import { daySummaries, nextDayUp, lastSessionReport, nightlyStreak, today, weekStart } from '../sessions.js';
-import { renderMusic } from './music.js';
+import { daySummaries, nextDayUp, lastSessionReport, nightlyStreak, today, weekStart,
+         resumableSession } from '../sessions.js';
+import { renderMusic, renderNowPlayingBar } from './music.js';
+import { powerParts, powerFrom, tierFor, tierGoalText, applyTierTheme } from '../power.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -20,6 +22,26 @@ function download(blob, filename) {
 }
 
 const UNIT_LABEL = { lb: 'lb', sec: 's', rep: ' reps', band_step: '', vest: '' };
+
+// The day list is crammed into a drop-down (Dom, 2026-08-25). Whether it is
+// open is a preference, not data, so it lives in localStorage rather than in
+// the .sqlite export — and a failed read must never take the home screen with
+// it (Safari private mode throws on localStorage).
+const DAYS_OPEN_KEY = 'htc-days-open';
+
+function daysOpen() {
+  try {
+    return localStorage.getItem(DAYS_OPEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function setDaysOpen(open) {
+  try {
+    localStorage.setItem(DAYS_OPEN_KEY, open ? '1' : '0');
+  } catch { /* preference lost, screen still works */ }
+}
 
 // "L  45 → 50 lb" — the whole suggestion at a glance.
 function moveText(f) {
@@ -44,21 +66,44 @@ export function renderHome(root) {
   // again next week. The all-time figure is kept alongside it so a reset reads
   // as a new week, not as lost work.
   const from = weekStart();
-  const powerOf = (since) => {
+  const countsSince = (since) => {
     const v = query(
       'SELECT COUNT(*) sets, COALESCE(SUM(l.reps_done),0) reps, ' +
       'COALESCE(SUM(l.hold_seconds_done),0) holds, COALESCE(SUM(l.weight_lb*l.reps_done),0) tonnage ' +
       'FROM set_log l JOIN session s ON s.id = l.session_id' +
-      (since ? " WHERE s.date >= ?" : ''), since ? [since] : [])[0];
+      (since ? ' WHERE s.date >= ?' : ''), since ? [since] : [])[0];
     const nights = query('SELECT COUNT(DISTINCT date) c FROM nightly_log'
       + (since ? ' WHERE date >= ?' : ''), since ? [since] : [])[0].c;
-    return Math.round(v.sets * 100 + v.reps * 10 + v.holds * 5 + v.tonnage / 10 + nights * 50);
+    return { sets: v.sets, reps: v.reps, holds: v.holds, tonnage: v.tonnage, nights };
   };
-  const power = powerOf(from);
-  const allTime = powerOf(null);
+  const weekCounts = countsSince(from);
+  const power = powerFrom(weekCounts);
+  const allTime = powerFrom(countsSince(null));
   const setCount = query('SELECT COUNT(*) c FROM set_log')[0].c;
+
+  // The form this week's number has reached, and the app's colours with it
+  // (Dom, 2026-08-25: "the home screen and layout should match based on the
+  // colors of each power level form automatically").
+  const rank = tierFor(power);
+  applyTierTheme(rank.tier);
+
   header.append(el('p', 'powerline',
-    '⚡ Power level: ' + power.toLocaleString() + (power > 9000 ? " — IT'S OVER 9,000!" : '')));
+    '⚡ Power level: ' + power.toLocaleString() + (power > 9000 ? ' — IT IS OVER 9,000!' : '')));
+
+  // ---- the goal tracker: which form, and what the next one costs ----
+  const form = el('div', 'tierbox');
+  const formRow = el('div', 'tierrow');
+  formRow.append(el('span', 'tiername', rank.tier.name));
+  formRow.append(el('span', 'tiergoal', tierGoalText(power)));
+  form.append(formRow);
+  const bar = el('div', 'tiertrack');
+  const fill = el('div', 'tierfill');
+  fill.style.width = rank.progressPct + '%';
+  bar.append(fill);
+  form.append(bar);
+  form.append(el('p', 'tierblurb', rank.tier.blurb));
+  header.append(form);
+
   const daysThisWeek = query(
     "SELECT COUNT(DISTINCT day_no) c FROM session WHERE status = 'complete' AND day_no > 0 AND date >= ?",
     [from])[0].c;
@@ -67,6 +112,33 @@ export function renderHome(root) {
     'this week · ' + daysThisWeek + ' of 4 training days · ' + nightsThisWeek
     + (nightsThisWeek === 1 ? ' night' : ' nights') + ' · resets Monday'
     + (allTime > power ? ' · all-time ' + allTime.toLocaleString() : '')));
+
+  // ---- the legend: exactly what is in the number (Dom, 2026-08-25) ----
+  // Collapsed by default: it is a thing you check, not a thing you read on
+  // every launch.
+  const legend = el('details', 'powerlegend');
+  legend.append(el('summary', null, 'What makes this number'));
+  const table = el('div', 'legendrows');
+  for (const part of powerParts(weekCounts)) {
+    const row = el('div', 'legendrow' + (part.points ? '' : ' legendzero'));
+    row.append(el('span', 'legendcount', part.count.toLocaleString()));
+    row.append(el('span', 'legendlabel', part.label));
+    row.append(el('span', 'legendeach', '× ' + part.each));
+    row.append(el('span', 'legendpts', Math.round(part.points).toLocaleString()));
+    table.append(row);
+  }
+  const total = el('div', 'legendrow legendtotal');
+  total.append(el('span', 'legendcount', ''));
+  total.append(el('span', 'legendlabel', 'this week'));
+  total.append(el('span', 'legendeach', ''));
+  total.append(el('span', 'legendpts', power.toLocaleString()));
+  table.append(total);
+  legend.append(table);
+  legend.append(el('p', 'muted',
+    'Everything resets Monday. The forms are one-week goals, set against what '
+    + 'this program actually scores: Super Saiyan is about one complete '
+    + 'training day, Super Saiyan God is all four.'));
+  header.append(legend);
   root.append(header);
 
   // ---------- back it up (risk register: Safari can evict IndexedDB) ----------
@@ -88,26 +160,77 @@ export function renderHome(root) {
     root.append(warn);
   }
 
-  // ---------- next up ----------
+  // ---------- resume a live session ----------
+  // Only a session with work actually in it — see resumableSession(), which is
+  // where the "not a session that was only viewed" rule lives. When there is
+  // none, this space belongs to the slim music bar below, which is permanent.
+  const live = resumableSession(db);
+  if (live) {
+    const card = el('section', 'resumecard');
+    const row = el('div', 'resumerow');
+    row.append(el('span', 'resumelabel', '⏱  Session in progress'));
+    row.append(el('span', 'resumemeta',
+      live.sets + (live.sets === 1 ? ' set' : ' sets') + ' logged'
+      + (live.daysAgo === 0 ? ''
+        : live.daysAgo === 1 ? ' · since yesterday'
+        : ' · ' + live.daysAgo + ' days ago')));
+    card.append(row);
+    card.append(el('div', 'resumeday', 'Day ' + live.day_no + ' — ' + live.name));
+    const back = el('a', 'btn btn-primary resumebtn', '▶  Resume Day ' + live.day_no);
+    back.href = '#/run/' + live.day_no;
+    card.append(back);
+    root.append(card);
+  }
+
+  // ---------- the permanent slim music bar ----------
+  // Where "Next up" used to sit. The full Music card, with the controls and the
+  // Connect button, has NOT moved — it is still at the bottom.
+  const slim = el('section', 'slimsec');
+  root.append(slim);
+  renderNowPlayingBar(slim);
+
+  // ---------- day list, as a drop-down tab bar ----------
   const next = nextDayUp(db);
-  const nextSec = el('section', 'nextsec');
-  nextSec.append(el('h2', null, 'Next up'));
-  const nextCard = el('div', 'nextcard');
-  nextCard.append(el('div', 'nextday', 'Day ' + next.day_no));
-  nextCard.append(el('div', 'nextname', next.name));
-  nextCard.append(el('p', 'muted',
-    next.daysAgo == null ? 'not trained yet'
-      : next.daysAgo === 0 ? 'last trained today'
-      : next.daysAgo === 1 ? 'last trained yesterday'
-      : 'last trained ' + next.daysAgo + ' days ago'));
-  const startBtn = el('a', 'btn btn-primary nextstart', '▶  Run Day ' + next.day_no);
-  startBtn.href = '#/run/' + next.day_no;
-  nextCard.append(startBtn);
-  const manual = el('a', 'nextmanual', 'or log it by hand');
-  manual.href = '#/day/' + next.day_no;
-  nextCard.append(manual);
-  nextSec.append(nextCard);
-  root.append(nextSec);
+  const list = el('nav', 'daylist');
+  const tab = el('button', 'daytab');
+  const tabLabel = el('span', 'daytablabel', 'All days');
+  const tabHint = el('span', 'daytabhint', '');
+  const caret = el('span', 'daycaret', '▾');
+  tab.append(tabLabel, tabHint, caret);
+  const drawer = el('div', 'daydrawer');
+  list.append(tab, drawer);
+
+  for (const d of daySummaries(db)) {
+    const a = el('a', 'daycard');
+    a.href = '#/day/' + d.day_no;
+    const title = d.day_no === 0 ? 'Nightly' : 'Day ' + d.day_no;
+    const row = el('div', 'daycard-row');
+    row.append(el('div', 'daycard-title', title));
+    if (d.openStatus === 'in_progress') row.append(el('span', 'chip chip-in_progress', 'in progress'));
+    else if (d.daysAgo === 0) row.append(el('span', 'chip chip-complete', 'done today'));
+    else if (d.day_no === next.day_no) row.append(el('span', 'chip chip-bias', 'next up'));
+    a.append(row);
+    a.append(el('div', 'daycard-sub', d.name));
+    a.append(el('div', 'daycard-meta',
+      d.daysAgo == null ? 'never' : d.daysAgo === 0 ? 'today'
+        : d.daysAgo === 1 ? 'yesterday' : d.daysAgo + ' days ago'));
+    drawer.append(a);
+  }
+
+  let open = daysOpen();
+  const paintTab = () => {
+    list.classList.toggle('open', open);
+    caret.textContent = open ? '▴' : '▾';
+    tabHint.textContent = open ? '' : 'Day ' + next.day_no + ' next';
+    tab.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+  tab.onclick = () => {
+    open = !open;
+    setDaysOpen(open);
+    paintTab();
+  };
+  paintTab();
+  root.append(list);
 
   // ---------- suggestions, grouped per exercise ----------
   const flags = pendingFlags(db);
@@ -180,7 +303,7 @@ export function renderHome(root) {
           + report.cleanPairs + ' exercises on target. '
           + (report.priorClean
             ? 'Suggestions are waiting above.'
-            : "That's 1 of 2. Run it clean once more and the app will suggest a jump.")));
+            : 'That is 1 of 2. Run it clean once more and the app will suggest a jump.')));
       } else if (report.cleanPairs > 0) {
         note.append(el('p', 'notetext',
           'Day ' + report.session.day_no + ' ' + when + ': ' + report.cleanPairs + ' on target, '
@@ -190,26 +313,27 @@ export function renderHome(root) {
     }
   }
 
-  // ---------- day list ----------
-  const list = el('nav', 'daylist');
-  list.append(el('h2', 'listhead', 'All days'));
-  for (const d of daySummaries(db)) {
-    const a = el('a', 'daycard');
-    a.href = '#/day/' + d.day_no;
-    const title = d.day_no === 0 ? 'Nightly' : 'Day ' + d.day_no;
-    const row = el('div', 'daycard-row');
-    row.append(el('div', 'daycard-title', title));
-    if (d.openStatus === 'in_progress') row.append(el('span', 'chip chip-in_progress', 'in progress'));
-    else if (d.daysAgo === 0) row.append(el('span', 'chip chip-complete', 'done today'));
-    else if (d.day_no === next.day_no) row.append(el('span', 'chip chip-bias', 'next up'));
-    a.append(row);
-    a.append(el('div', 'daycard-sub', d.name));
-    a.append(el('div', 'daycard-meta',
-      d.daysAgo == null ? 'never' : d.daysAgo === 0 ? 'today'
-        : d.daysAgo === 1 ? 'yesterday' : d.daysAgo + ' days ago'));
-    list.append(a);
-  }
-  root.append(list);
+  // ---------- next up ----------
+  // Dropped below the day drawer (Dom, 2026-08-25). It is still the biggest
+  // card on the screen — it just is not the first thing any more.
+  const nextSec = el('section', 'nextsec');
+  nextSec.append(el('h2', null, 'Next up'));
+  const nextCard = el('div', 'nextcard');
+  nextCard.append(el('div', 'nextday', 'Day ' + next.day_no));
+  nextCard.append(el('div', 'nextname', next.name));
+  nextCard.append(el('p', 'muted',
+    next.daysAgo == null ? 'not trained yet'
+      : next.daysAgo === 0 ? 'last trained today'
+      : next.daysAgo === 1 ? 'last trained yesterday'
+      : 'last trained ' + next.daysAgo + ' days ago'));
+  const startBtn = el('a', 'btn btn-primary nextstart', '▶  Run Day ' + next.day_no);
+  startBtn.href = '#/run/' + next.day_no;
+  nextCard.append(startBtn);
+  const manual = el('a', 'nextmanual', 'or log it by hand');
+  manual.href = '#/day/' + next.day_no;
+  nextCard.append(manual);
+  nextSec.append(nextCard);
+  root.append(nextSec);
 
   // ---------- is the gap closing? ----------
   const progress = el('a', 'btn progresslink', '📉  Is the gap closing?');

@@ -30,12 +30,29 @@ class ClassList {
 }
 
 // ".chip", "div", ".a.b" — enough for what the app actually queries.
+// One compound selector: 'div', '.card', 'a.btn.primary'.
+function matchesSimple(el, part) {
+  const classes = part.match(/\.[A-Za-z0-9_-]+/g) || [];
+  const tag = part.replace(/\.[A-Za-z0-9_-]+/g, '').trim();
+  if (tag && tag !== '*' && el.tagName !== tag.toUpperCase()) return false;
+  return classes.every((c) => el.classList.contains(c.slice(1)));
+}
+
+// Comma groups and DESCENDANT combinators ('.drawer .card'). Without the
+// descendant support the stub silently read '.a .b' as one element carrying
+// both classes, so a check written against real DOM semantics came back 0 and
+// looked like an app bug. No child/sibling combinators — nothing here uses them.
 function matches(el, selector) {
-  return selector.split(/\s*,\s*/).some((part) => {
-    const classes = part.match(/\.[A-Za-z0-9_-]+/g) || [];
-    const tag = part.replace(/\.[A-Za-z0-9_-]+/g, '').trim();
-    if (tag && el.tagName !== tag.toUpperCase()) return false;
-    return classes.every((c) => el.classList.contains(c.slice(1)));
+  return selector.split(/\s*,\s*/).some((group) => {
+    const parts = group.trim().split(/\s+/);
+    if (!matchesSimple(el, parts[parts.length - 1])) return false;
+    let node = el.parentNode;
+    for (let i = parts.length - 2; i >= 0; i--) {
+      while (node && !matchesSimple(node, parts[i])) node = node.parentNode;
+      if (!node) return false;
+      node = node.parentNode;
+    }
+    return true;
   });
 }
 
@@ -46,7 +63,14 @@ class El {
     this.children = [];
     this.parentNode = null;
     this.className = '';
-    this.style = {};
+    // A real CSSStyleDeclaration carries these two, and js/power.js uses
+    // setProperty to repaint the app in the current form's colours. A bare
+    // object would have let that ship as a blank home screen.
+    this.style = {
+      setProperty(name, value) { this[name] = value; },
+      removeProperty(name) { delete this[name]; },
+      getPropertyValue(name) { return this[name] == null ? '' : String(this[name]); },
+    };
     this.dataset = {};
     this.attributes = {};
     this.listeners = {};

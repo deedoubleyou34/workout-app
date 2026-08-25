@@ -128,6 +128,39 @@ export function clearRunnerState(db) {
   db.run("DELETE FROM meta WHERE key = 'runner_state'");
 }
 
+// The session the home screen offers to resume, or null.
+//
+// Dom, 2026-08-25: "Resume session section should only pop up when there is a
+// logged active live session (not a session that was only viewed)."
+//
+// status = 'in_progress' on its own does NOT mean that. renderRun() opens a
+// session the moment the runner is entered, so merely tapping into a day to
+// look at it leaves an in-progress session behind with nothing in it. A
+// session is live when work has actually happened in it: a set is logged, or
+// the runner is parked past the first step.
+//
+// Deliberately NOT scoped to today. A session started at 11pm and force-quit
+// is exactly the one worth resuming, and it is yesterday's by the time he
+// picks the phone up.
+export function resumableSession(db) {
+  let parked = null;
+  const raw = rows(db, "SELECT value FROM meta WHERE key = 'runner_state'")[0];
+  if (raw) {
+    try { parked = JSON.parse(raw.value); } catch { parked = null; }
+  }
+  const open = rows(db,
+    "SELECT * FROM session WHERE status = 'in_progress' AND day_no > 0 " +
+    'ORDER BY date DESC, id DESC');
+  for (const s of open) {
+    const sets = rows(db, 'SELECT COUNT(*) c FROM set_log WHERE session_id = ?', [s.id])[0].c;
+    const atStep = parked && parked.session_id === s.id ? (parked.index || 0) : 0;
+    if (!sets && atStep <= 0) continue;              // opened, never worked
+    const day = rows(db, 'SELECT name FROM day_template WHERE day_no = ?', [s.day_no])[0];
+    return { ...s, sets, name: day ? day.name : '', daysAgo: daysBetween(s.date, today()) };
+  }
+  return null;
+}
+
 // What each day looks like on the home list.
 export function daySummaries(db) {
   const days = rows(db,

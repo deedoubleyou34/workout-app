@@ -756,3 +756,161 @@ html, body {
 /* the runner's music sheet */
 .musicbtn-top { font-size: 1.1rem; }
 .sheetmusic { margin: 6px 0; }
+
+/* ================= build 025: the home screen Dom asked for ================= */
+
+/* ---- power level as a goal tracker ----
+   The accent/tier custom properties are set from js/power.js on every home
+   render, so everything below re-colours itself when a form is reached. */
+.tierbox {
+  margin: 10px 0 6px;
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--edge);
+  border-left: 3px solid var(--tier, var(--gold));
+  border-radius: 12px;
+}
+.tierrow { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.tiername {
+  font-size: 1.05rem;
+  font-weight: 800;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--tier, var(--gold));
+  text-shadow: 0 0 14px var(--tier-glow, rgba(255, 215, 94, 0.4));
+}
+.tiergoal { font-size: 0.76rem; color: var(--muted); text-align: right; }
+.tiertrack {
+  height: 7px;
+  margin: 8px 0 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.tierfill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--tier, var(--gold));
+  box-shadow: 0 0 12px var(--tier-glow, rgba(255, 215, 94, 0.4));
+  transition: width 0.4s ease;
+}
+.tierblurb { font-size: 0.74rem; color: var(--muted); }
+
+/* ---- the legend: what is actually in the number ---- */
+.powerlegend { margin-top: 8px; }
+.powerlegend summary {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 6px 0;
+  min-height: 32px;
+}
+.powerlegend[open] summary { color: var(--tier, var(--gold)); }
+.legendrows { margin: 4px 0 8px; }
+.legendrow {
+  display: grid;
+  grid-template-columns: 4.5em 1fr 3.2em 5em;
+  gap: 6px;
+  align-items: baseline;
+  padding: 4px 0;
+  font-size: 0.8rem;
+  border-bottom: 1px solid var(--edge);
+}
+.legendcount { font-weight: 700; text-align: right; color: var(--fg); }
+.legendlabel { color: var(--muted); }
+.legendeach { color: var(--muted); font-size: 0.72rem; text-align: right; }
+.legendpts { font-weight: 700; text-align: right; color: var(--tier, var(--gold)); }
+.legendzero .legendcount, .legendzero .legendpts { color: var(--muted); font-weight: 400; }
+.legendtotal { border-bottom: none; border-top: 1px solid var(--tier, var(--gold)); font-weight: 800; }
+.legendtotal .legendlabel { color: var(--fg); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.72rem; }
+
+/* ---- resume a live session: only ever drawn when one exists ---- */
+.resumecard {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  background: linear-gradient(160deg, #23182a, var(--card));
+  border: 1px solid var(--tier, var(--gold));
+  border-radius: 14px;
+  box-shadow: 0 0 20px var(--tier-glow, rgba(255, 215, 94, 0.2));
+}
+.resumerow { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.resumelabel {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 800;
+  color: var(--tier, var(--gold));
+}
+.resumemeta { font-size: 0.72rem; color: var(--muted); }
+.resumeday { font-size: 1rem; font-weight: 700; margin: 4px 0 2px; }
+.resumebtn { margin-top: 8px; }
+
+/* ---- the permanent slim music bar ---- */
+.slimsec { margin-bottom: 14px; }
+.slimbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--card);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.slimicon { color: var(--tier, var(--gold)); font-size: 0.9rem; flex: none; }
+.slimoff .slimicon { color: var(--muted); }
+.slimwin { flex: 1; overflow: hidden; min-width: 0; }
+.slimtrack { display: flex; width: max-content; gap: 3em; }
+.slimtext {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+}
+.slimoff .slimtext { color: var(--muted); font-weight: 400; }
+/* only a title too long for the line revolves; --roll is set per track so a
+   long name does not crawl and a short one does not bolt */
+.rolling .slimtrack { animation: slimroll var(--roll, 14s) linear infinite; }
+@keyframes slimroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(calc(-50% - 1.5em)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rolling .slimtrack { animation: none; }
+  .rolling .slimtext { overflow: hidden; text-overflow: ellipsis; }
+}
+
+/* ---- All days, crammed into a drop-down tab bar ---- */
+.daytab {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  background: var(--card);
+  color: var(--fg);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+.daytablabel { flex: none; }
+.daytabhint {
+  flex: 1;
+  text-align: right;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+.daycaret { flex: none; color: var(--tier, var(--gold)); }
+.open .daytabhint { flex: 1; }
+.daydrawer { display: none; flex-direction: column; gap: 10px; margin-top: 10px; }
+.open .daydrawer { display: flex; }

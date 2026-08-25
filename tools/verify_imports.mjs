@@ -64,7 +64,39 @@ for (const file of files) {
   }
 }
 
+// ---- and every shipped file is in the service worker's precache list ----
+//
+// A new module that imports cleanly and renders fine on the PC is still a
+// blank screen in the gym if sw.js never cached it: the app opens offline from
+// the cache, and a file that is not in SHELL is a network request that fails.
+// js/power.js shipped in build 026 and was missed exactly this way, which is
+// why this check exists.
+//
+// sw.js itself is deliberately not in its own list — the browser fetches the
+// worker directly, and caching it would pin the old one forever.
+const swSrc = readFileSync('sw.js', 'utf8');
+const precached = new Set(
+  [...swSrc.matchAll(/'\.\/([^']*)'/g)].map((m) => m[1]).filter(Boolean));
+
+const SKIP_DIRS = new Set(['.git', 'node_modules', 'tools', 'audio', 'vendor', 'icons']);
+const shipped = [];
+(function walk(dir) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (SKIP_DIRS.has(entry.name)) continue;
+    const full = dir + '/' + entry.name;
+    if (entry.isDirectory()) walk(full);
+    else if (/\.(js|mjs|css|sql|html)$/.test(entry.name)) shipped.push(full.replace(/^\.\//, ''));
+  }
+}('.'));
+
+const uncached = shipped.filter((f) => f !== 'sw.js' && !precached.has(f));
+for (const f of uncached) {
+  console.log('FAIL  ' + f + ' ships but is not in the service worker SHELL — it will '
+    + 'fail to load offline');
+  broken++;
+}
+
 console.log(broken === 0
-  ? 'ALL ' + checked + ' NAMED IMPORTS RESOLVE'
-  : broken + ' BROKEN IMPORT(S)');
+  ? 'ALL ' + checked + ' NAMED IMPORTS RESOLVE, ' + shipped.length + ' SHIPPED FILES PRECACHED'
+  : broken + ' PROBLEM(S)');
 process.exit(broken === 0 ? 0 : 1);

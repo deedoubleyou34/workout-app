@@ -86,6 +86,59 @@ const db = getDb();
     check('home names the next day up', /Day [1-4]/.test(home.textContent));
     check('home offers a run link', !!home.querySelector('.nextstart'));
     check('a fresh database does NOT nag for a backup', !home.querySelector('.backupcard'));
+
+    // ---- build 025: the home screen Dom asked for ----
+    // The slim music bar is PERMANENT. Nothing about being logged out of
+    // Spotify, or having no data, is allowed to remove it.
+    check('the slim music bar is there on a brand-new database',
+      !!home.querySelector('.slimbar'));
+    // It reads its state from IndexedDB and then asks Spotify, so its first
+    // text is a placeholder until that resolves — the same one frame Dom would
+    // see on the phone. The harness carries a token but has no network, so the
+    // state it settles into here is the offline one.
+    await tick(4);
+    const slimText = home.querySelector('.slimbar').textContent;
+    check('the slim bar settles on a quiet, readable line rather than an error',
+      /Music offline|not connected|Nothing playing|—/.test(slimText)
+      && !/undefined|\[object|Error/.test(slimText), slimText);
+    check('a dead network is not painted as a failure there',
+      !home.querySelector('.slimbar').classList.contains('bad'), slimText);
+    check('the full Music card is still at the bottom, below the slim bar',
+      home.children.indexOf(home.querySelector('.musicsec'))
+      > home.children.indexOf(home.querySelector('.slimsec')));
+
+    // Nothing has been trained, so there is nothing to resume.
+    check('no resume card on a database with no live session',
+      !home.querySelector('.resumecard'));
+
+    // All days is a drop-down, closed, and Next up now sits BELOW it.
+    const drawer = home.querySelector('.daylist');
+    check('the day list is a drop-down tab bar', !!home.querySelector('.daytab'));
+    check('and it starts closed', drawer && !drawer.classList.contains('open'));
+    check('the day cards are all in the drawer, not loose on the page',
+      home.querySelectorAll('.daydrawer .daycard').length === 5,
+      home.querySelectorAll('.daydrawer .daycard').length + ' cards');
+    check('Next up has dropped below the day drawer',
+      home.children.indexOf(home.querySelector('.nextsec'))
+      > home.children.indexOf(drawer));
+    if (drawer) {
+      home.querySelector('.daytab').click();
+      check('tapping the tab bar opens it', drawer.classList.contains('open'));
+      home.querySelector('.daytab').click();
+      check('and tapping again closes it', !drawer.classList.contains('open'));
+    }
+
+    // The power level is a goal tracker now: a form, a bar, and a legend.
+    check('home names the current form', contains(home, 'Base'));
+    check('home says what the next form costs', contains(home, 'more to Kaio-ken'));
+    check('the progress bar toward it is drawn', !!home.querySelector('.tierfill'));
+    check('the legend lists every contributor',
+      home.querySelectorAll('.legendrows .legendrow').length === 6,
+      home.querySelectorAll('.legendrows .legendrow').length + ' rows');
+    check('the legend names the nightly contribution too', contains(home, 'nights logged'));
+    check('the form repaints the app rather than only itself',
+      globalThis.document.documentElement.dataset.tier === 'base',
+      String(globalThis.document.documentElement.dataset.tier));
   }
 
   const day = await render('day 1', (root) => renderDay(root, 1));
@@ -434,7 +487,25 @@ const db = getDb();
 // ---------------------------------------------------------------- with history
 {
   const home = await render('home (with a session logged)', (root) => renderHome(root));
-  if (home) check('home still renders once there is history', contains(home, 'Power level'));
+  if (home) {
+    check('home still renders once there is history', contains(home, 'Power level'));
+    // Sets were logged into an in-progress session above, which is exactly the
+    // "logged active live session" Dom wants the resume card for.
+    check('a session with work in it offers a resume card',
+      !!home.querySelector('.resumecard'), home.textContent.slice(0, 80));
+    check('and the resume card links straight into the runner',
+      (home.querySelector('.resumebtn') || {}).href
+        && home.querySelector('.resumebtn').href.startsWith('#/run/'),
+      String((home.querySelector('.resumebtn') || {}).href));
+    check('the resume card sits above the slim bar, near the top',
+      home.children.indexOf(home.querySelector('.resumecard'))
+      < home.children.indexOf(home.querySelector('.slimsec')));
+    check('the slim bar is still there alongside it',
+      !!home.querySelector('.slimbar'));
+    check('logged work moves the legend off zero',
+      !home.querySelector('.legendrows .legendrow').classList.contains('legendzero'),
+      home.querySelector('.legendrows .legendrow').textContent);
+  }
 
   const dash = await render('dashboard (with a session logged)', (root) => renderDashboard(root));
   if (dash) check('the dashboard renders with real rows behind it', dash.textContent.length > 50);

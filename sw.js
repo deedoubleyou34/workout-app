@@ -1,5 +1,5 @@
 // Cache-first app shell. Bump CACHE on every deploy that changes shell files.
-const CACHE = 'shell-v25';
+const CACHE = 'shell-v26';
 
 const SHELL = [
   './',
@@ -16,6 +16,7 @@ const SHELL = [
   './js/seed.js',
   './js/schema.sql',
   './js/ui/home.js',
+  './js/power.js',
   './js/ui/dashboard.js',
   './js/ui/settings.js',
   './js/ui/picker.js',

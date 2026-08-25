@@ -16,6 +16,88 @@ function el(tag, cls, text) {
   return n;
 }
 
+// ---------- the slim bar (home screen, build 025) ----------
+//
+// Dom, 2026-08-25: "fill in that space with a spotify slim bar showing the
+// current music title and artist in a revolving fashion, keeping the spotify
+// connect section at the bottom where it is."
+//
+// So this is one line, permanent, and deliberately NOT a second set of
+// controls: the controls live in the Music card at the bottom of the screen,
+// which has not moved. It is there to answer "what is this?" at a glance.
+//
+// "Revolving" = the title scrolls when it is too long for the line. The
+// duplicate copy of the text is what makes the loop seamless; it is aria-hidden
+// so a screen reader is not told the track name twice.
+let stopBar = null;
+
+export function renderNowPlayingBar(container) {
+  if (stopBar) stopBar();                 // only ever one of these
+
+  const bar = el('div', 'slimbar');
+  const icon = el('span', 'slimicon', '♪');
+  const win = el('div', 'slimwin');
+  const track = el('div', 'slimtrack');
+  const a = el('span', 'slimtext', 'Spotify');
+  const b = el('span', 'slimtext', '');
+  b.setAttribute('aria-hidden', 'true');
+  track.append(a, b);
+  win.append(track);
+  bar.append(icon, win);
+  container.append(bar);
+
+  let timer = null;
+  let disposed = false;
+  const stop = () => {
+    disposed = true;
+    if (timer) clearInterval(timer);
+    timer = null;
+    if (stopBar === stop) stopBar = null;
+  };
+  stopBar = stop;
+  const alive = () => !disposed && bar.isConnected;
+
+  // Scroll only when the text does not fit. A short title that crawls sideways
+  // for no reason is worse than one that sits still.
+  function setText(text, { marquee = true } = {}) {
+    a.textContent = text;
+    const overflows = marquee && win.clientWidth > 0 && a.scrollWidth > win.clientWidth;
+    b.textContent = overflows ? text : '';
+    bar.classList.toggle('rolling', overflows);
+    // The loop travels exactly one copy's width, so the speed has to scale
+    // with the text or a long title crawls and a short one bolts.
+    if (overflows) track.style.setProperty('--roll', Math.max(a.scrollWidth / 40, 8) + 's');
+  }
+
+  async function refresh() {
+    if (!alive()) return stop();
+    await spotify.loadAuth();
+    if (!spotify.isConnected()) {
+      bar.classList.add('slimoff');
+      setText('Spotify not connected — the Music card is at the bottom.', { marquee: false });
+      return;
+    }
+    bar.classList.remove('slimoff');
+    try {
+      const state = await spotify.player.state();
+      const text = spotify.nowPlayingText(state);
+      icon.textContent = state && state.is_playing ? '▶' : '⏸';
+      setText(text || 'Nothing playing.', { marquee: !!text });
+    } catch (err) {
+      icon.textContent = '♪';
+      // Offline is not news: the app is built to work without a network.
+      setText(err && err.kind === 'offline' ? 'Music offline' : 'Spotify', { marquee: false });
+    }
+  }
+
+  refresh();
+  timer = setInterval(() => {
+    if (!alive()) return stop();
+    if (document.visibilityState === 'visible') refresh();
+  }, 15000);
+  return stop;
+}
+
 // The runner redraws its rest screen on every repaint, so only the newest
 // compact panel PER PLACE is allowed to keep polling. Keyed, because the
 // music sheet and the rest screen can be on screen at the same time and one
