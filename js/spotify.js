@@ -310,7 +310,18 @@ async function request(path, { method = 'GET', body = null, query = null, retry 
 export const player = {
   state: () => request('/me/player'),
   devices: () => request('/me/player/devices').then((d) => (d && d.devices) || []),
-  play: (deviceId) => request('/me/player/play', { method: 'PUT', query: deviceId ? { device_id: deviceId } : null }),
+  // With no contextUri this sends NO body, which resumes whatever was playing.
+  // Passing a body with a context_uri would restart a playlist from track one,
+  // which is right for a phase change and very wrong after a voice cue.
+  play: (deviceId, contextUri = null) => request('/me/player/play', {
+    method: 'PUT',
+    query: deviceId ? { device_id: deviceId } : null,
+    body: contextUri ? { context_uri: contextUri } : null,
+  }),
+  shuffle: (state, deviceId) => request('/me/player/shuffle', {
+    method: 'PUT',
+    query: { state: state ? 'true' : 'false', ...(deviceId ? { device_id: deviceId } : {}) },
+  }),
   pause: () => request('/me/player/pause', { method: 'PUT' }),
   next: () => request('/me/player/next', { method: 'POST' }),
   previous: () => request('/me/player/previous', { method: 'POST' }),

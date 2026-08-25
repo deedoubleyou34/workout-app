@@ -127,6 +127,34 @@ export function barChart({ labels, series, width = 340, height = 170, format = (
   return svg;
 }
 
+// A countdown ring, per the spec's session walkthrough. Returns the <svg> with
+// an `update(fraction)` on it: the ticker repaints four times a second, so it
+// moves one attribute rather than rebuilding the node.
+export function progressRing({ size = 200, stroke = 10, color = '#57c7ff' } = {}) {
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const svg = frame(size, size);
+  svg.setAttribute('class', 'chart ring');
+  const common = { cx: size / 2, cy: size / 2, r, fill: 'none', 'stroke-width': stroke };
+  svg.append(node('circle', { ...common, class: 'ring-track' }));
+  const arc = node('circle', {
+    ...common,
+    class: 'ring-arc',
+    stroke: color,
+    'stroke-linecap': 'round',
+    'stroke-dasharray': circumference,
+    'stroke-dashoffset': 0,
+    transform: 'rotate(-90 ' + size / 2 + ' ' + size / 2 + ')',
+  });
+  svg.append(arc);
+  svg.update = (fraction) => {
+    const clamped = Math.max(0, Math.min(Number(fraction) || 0, 1));
+    arc.setAttribute('stroke-dashoffset', String(circumference * (1 - clamped)));
+  };
+  svg.update(1);
+  return svg;
+}
+
 export function legend(series) {
   const wrap = document.createElement('div');
   wrap.className = 'chart-legend';

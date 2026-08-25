@@ -1,4 +1,5 @@
-import { query, storageStatus, exportSqliteBlob, exportJsonBlob, exportCsvBlob, importBytes, getDb, persist } from '../db.js';
+import { query, storageStatus, exportSqliteBlob, exportJsonBlob, exportCsvBlob, importBytes,
+         getDb, persist, backupStatus, markBackedUp } from '../db.js';
 import { pendingFlags, acceptFlag, acceptAll, declineFlag, snoozeFlag, isSessionHit } from '../progression.js';
 import { daySummaries, nextDayUp, lastSessionReport, nightlyStreak, today, weekStart } from '../sessions.js';
 import { renderMusic } from './music.js';
@@ -67,6 +68,25 @@ export function renderHome(root) {
     + (nightsThisWeek === 1 ? ' night' : ' nights') + ' · resets Monday'
     + (allTime > power ? ' · all-time ' + allTime.toLocaleString() : '')));
   root.append(header);
+
+  // ---------- back it up (risk register: Safari can evict IndexedDB) ----------
+  const backup = backupStatus();
+  if (backup.due) {
+    const warn = el('section', 'backupcard');
+    warn.append(el('h2', null, '⚠️  Back up your training data'));
+    warn.append(el('p', null, backup.since + ' sessions since your last backup'
+      + (backup.everExported ? '' : ' — you have never made one')
+      + '. Safari can evict this app’s storage without warning, and the .sqlite file '
+      + 'is the only thing that can put it back.'));
+    const now = el('button', 'btn btn-primary', 'Export .sqlite now');
+    now.onclick = async () => {
+      download(exportSqliteBlob(), 'workout-' + today() + '.sqlite');
+      await markBackedUp();
+      renderHome(root);
+    };
+    warn.append(now);
+    root.append(warn);
+  }
 
   // ---------- next up ----------
   const next = nextDayUp(db);
@@ -207,7 +227,12 @@ export function renderHome(root) {
   const row = el('div', 'btnrow');
 
   const expSql = el('button', 'btn', 'Export .sqlite');
-  expSql.onclick = () => download(exportSqliteBlob(), 'workout-' + today() + '.sqlite');
+  expSql.onclick = async () => {
+    download(exportSqliteBlob(), 'workout-' + today() + '.sqlite');
+    // only the .sqlite export clears the backup nag: it is the only format
+    // that can be imported back
+    await markBackedUp();
+  };
   const expJson = el('button', 'btn', 'Export .json');
   expJson.onclick = () => download(exportJsonBlob(), 'workout-' + today() + '.json');
   const expCsv = el('button', 'btn', 'Export .csv');
@@ -237,6 +262,9 @@ export function renderHome(root) {
 
   row.append(expSql, expCsv, expJson, imp, file);
   data.append(row);
+  const settingsLink = el('a', 'testlink', 'Settings — music, backup, start fresh →');
+  settingsLink.href = '#/settings';
+  data.append(settingsLink);
   const testLink = el('a', 'testlink', 'Run progression tests →');
   testLink.href = 'tests/test.html';
   data.append(testLink);

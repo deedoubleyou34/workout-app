@@ -617,3 +617,67 @@ html, body {
 .chartunit { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
 .duckdot { font-size: 0.68rem; color: var(--muted); letter-spacing: 0.02em; }
 .duckdot.lost { color: var(--miss); }
+
+/* ---- countdown ring (build 020) ---- */
+.dial {
+  position: relative;
+  width: min(62vw, 240px);
+  margin: 10px auto 4px;
+  aspect-ratio: 1 / 1;
+}
+.dial-hold { width: min(46vw, 180px); }
+.dial .ring { position: absolute; inset: 0; }
+.ring-track { stroke: rgba(255, 255, 255, 0.08); }
+.ring-arc { transition: stroke-dashoffset 0.25s linear; }
+.dial .restclock, .dial .holdclock {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
+
+/* ---- settings (build 020) ---- */
+.phaserow { margin: 12px 0; }
+.phaselabel {
+  display: block;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.phaserow input[type="url"] {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--edge);
+  background: #0b1020;
+  color: var(--fg);
+  font-size: 0.9rem;
+}
+.shufflewrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.shufflewrap input { width: 20px; height: 20px; }
+.dangercard { border-color: rgba(255, 93, 109, 0.4); }
+.dangercard .cardlabel { color: var(--danger); }
+
+/* ---- backup nag ---- */
+.backupcard {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 140, 46, 0.5);
+  background: rgba(255, 140, 46, 0.1);
+}
+.backupcard h2 { font-size: 1rem; color: var(--orange); margin-bottom: 6px; }
+.backupcard p { font-size: 0.85rem; line-height: 1.45; margin-bottom: 10px; }

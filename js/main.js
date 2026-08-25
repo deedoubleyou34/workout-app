@@ -5,11 +5,13 @@ import { renderHome } from './ui/home.js';
 import { renderDay } from './ui/day.js';
 import { renderRun } from './ui/run.js';
 import { renderDashboard } from './ui/dashboard.js';
+import { renderSettings } from './ui/settings.js';
 
 const app = document.getElementById('app');
 
 function route() {
   if (location.hash.startsWith('#/progress')) return renderDashboard(app);
+  if (location.hash.startsWith('#/settings')) return renderSettings(app);
   const run = location.hash.match(/^#\/run\/(\d+)/);
   if (run) return renderRun(app, Number(run[1]));
   const day = location.hash.match(/^#\/day\/(\d+)/);

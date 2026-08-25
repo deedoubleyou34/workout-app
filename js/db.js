@@ -248,6 +248,60 @@ export function exportCsvBlob() {
   return new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/csv' });
 }
 
+// ---------- backup nagging (risk register: "Safari evicts IndexedDB") ----------
+//
+// The mitigation the spec asks for is a prompt every 10 sessions. It only
+// counts the .sqlite export, because that is the only format that can be
+// imported back — clearing the nag with a CSV would be clearing it with
+// something that cannot restore anything.
+
+function metaValue(key) {
+  const res = query('SELECT value FROM meta WHERE key = ?', [key]);
+  return res.length ? res[0].value : null;
+}
+
+export function backupStatus() {
+  const completed = query("SELECT COUNT(*) c FROM session WHERE status = 'complete'")[0].c;
+  const at = Number(metaValue('sessions_at_last_export') || 0);
+  const since = Math.max(completed - at, 0);
+  return { completed, since, due: since >= 10, everExported: at > 0 };
+}
+
+export async function markBackedUp() {
+  const completed = query("SELECT COUNT(*) c FROM session WHERE status = 'complete'")[0].c;
+  db.run("INSERT OR REPLACE INTO meta (key, value) VALUES ('sessions_at_last_export', ?)",
+    [String(completed)]);
+  await persist();
+}
+
+// ---------- start fresh ----------
+//
+// Wipes everything Dom has LOGGED and keeps everything that describes the
+// program. Built for the handover from development to the real three-week
+// test: the app should start that period with nothing in it.
+//
+// Deliberately NOT a blanket 'DELETE FROM meta': dropping schema_version would
+// send the next launch back through every migration against an already-current
+// schema, which fails on the first ALTER TABLE. The playlist mapping is
+// configuration, not data, and survives too.
+export async function resetTrainingData({ forgetSpotify = false } = {}) {
+  const before = query("SELECT COUNT(*) c FROM set_log")[0].c;
+  db.run('DELETE FROM set_log');
+  db.run('DELETE FROM progression_flag');
+  db.run('DELETE FROM current_load');
+  db.run('DELETE FROM nightly_log');
+  db.run('DELETE FROM session');
+  db.run("DELETE FROM meta WHERE key IN ('runner_state', 'sessions_at_last_export')");
+  await persist();
+
+  // These live in the kv store, not in the database blob. A stale duck record
+  // would try to restore a volume on a device from weeks ago.
+  await idbPut('duck-stranded', null);
+  await idbPut('duck-strategies', null);
+  if (forgetSpotify) await idbPut('spotify-auth', null);
+  return { setsDeleted: before };
+}
+
 const SQLITE_MAGIC = 'SQLite format 3';
 
 export async function importBytes(bytes) {

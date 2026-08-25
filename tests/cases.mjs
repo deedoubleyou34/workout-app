@@ -18,6 +18,8 @@ import { pickStrategy, planCycle, canRelease, MIN_CYCLE_MS } from '../js/ducking
 import { capacityOf, bestCapacity, gapPct, weeklySeries,
          verdictFor } from '../js/asymmetry.js';
 import { niceBounds } from '../js/charts.js';
+import { parsePlaylist, playlistUrl, phaseForCategory, defaultConfig,
+         loadConfig, saveConfig, isConfigured, PHASES } from '../js/playlists.js';
 
 const EX = {
   slRdl:      { id: 1, name: 'Single-leg RDL (DB)', category: 'strength',   load_type: 'dumbbell',   is_timed: 0, increment_value: 5,  increment_unit: 'lb' },
@@ -689,6 +691,104 @@ export async function run(ctx) {
     eq('bounds cover the data', niceBounds([3, 47]).max >= 47, true);
     check('a flat series still has a drawable range', niceBounds([5, 5]).max > niceBounds([5, 5]).min);
     eq('an empty series does not produce NaN bounds', niceBounds([]), { min: 0, max: 1 });
+  }
+
+  // 43. playlist links: whatever Spotify's share sheet produces has to work,
+  //     because that is the only way Dom will ever enter one
+  {
+    const id = '37i9dQZF1DXcBWIGoYBM5M';
+    eq('a share link parses', parsePlaylist('https://open.spotify.com/playlist/' + id + '?si=abc123'),
+      'spotify:playlist:' + id);
+    eq('a localised share link parses too',
+      parsePlaylist('https://open.spotify.com/intl-de/playlist/' + id), 'spotify:playlist:' + id);
+    eq('a raw URI passes through', parsePlaylist('spotify:playlist:' + id), 'spotify:playlist:' + id);
+    eq('a bare id is accepted', parsePlaylist(id), 'spotify:playlist:' + id);
+    eq('surrounding whitespace from a paste is ignored',
+      parsePlaylist('  spotify:playlist:' + id + '  '), 'spotify:playlist:' + id);
+    check('an album link is not a playlist',
+      parsePlaylist('https://open.spotify.com/album/' + id) === null);
+    check('an empty field is not a playlist', parsePlaylist('') === null);
+    check('nonsense is not a playlist', parsePlaylist('my gym mix') === null);
+    eq('and a stored URI turns back into a link a human can open',
+      playlistUrl('spotify:playlist:' + id), 'https://open.spotify.com/playlist/' + id);
+  }
+
+  // 44. every runner category maps to one of the four musical phases —
+  //     an unmapped category would mean silence where music was expected
+  {
+    eq('the warm-up has its own phase', phaseForCategory('warmup'), 'warmup');
+    eq('knee work is main work as far as music goes', phaseForCategory('knee'), 'main');
+    eq('every superset is main work', [phaseForCategory('superset 1'), phaseForCategory('superset 3')],
+      ['main', 'main']);
+    eq('power is its own phase', phaseForCategory('power'), 'power');
+    eq('the finisher, core, calves, glutes and close all ride the finisher playlist',
+      ['finisher', 'core', 'calves', 'glutes', 'close'].map(phaseForCategory),
+      ['finisher', 'finisher', 'finisher', 'finisher', 'finisher']);
+    check('a category with no step has no phase', phaseForCategory(null) === null);
+    eq('shuffle is on for main work and off for power (spec Phase 8 step 4)',
+      [defaultConfig().main.shuffle, defaultConfig().power.shuffle], [true, false]);
+  }
+
+  // 45. the mapping survives a save/load round trip through meta
+  {
+    const SQL = await ctx.initSqlJs();
+    const db = new SQL.Database();
+    db.run(await ctx.loadSchema());
+    seed(db);
+    check('nothing configured to begin with', !isConfigured(loadConfig(db)));
+    saveConfig(db, {
+      warmup: { uri: 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M?si=x', shuffle: true },
+      main: { uri: 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd', shuffle: true },
+      power: { uri: 'not a playlist', shuffle: false },
+      finisher: { uri: '', shuffle: false },
+    });
+    const back = loadConfig(db);
+    eq('links are stored canonicalised, not as pasted',
+      back.warmup.uri, 'spotify:playlist:37i9dQZF1DXcBWIGoYBM5M');
+    eq('a URI stays a URI', back.main.uri, 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd');
+    check('an unparseable entry is stored as nothing, not as junk', back.power.uri === null);
+    check('a blank phase stays blank', back.finisher.uri === null);
+    check('and the app now knows it has music to switch to', isConfigured(back));
+    eq('every phase has an entry after a partial save', PHASES.every((p) => p in back), true);
+    db.close();
+  }
+
+  // 46. starting fresh: everything logged goes, everything describing the
+  //     program stays — and schema_version above all, or the next launch
+  //     re-runs every migration against an already-current schema
+  {
+    const SQL = await ctx.initSqlJs();
+    const db = new SQL.Database();
+    db.run(await ctx.loadSchema());
+    seed(db);
+    db.run("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '6')");
+    db.run("INSERT OR REPLACE INTO meta (key, value) VALUES ('runner_state', '{\"index\":4}')");
+    saveConfig(db, { main: { uri: 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd', shuffle: true } });
+    db.run("INSERT INTO session (date, day_no, status) VALUES ('2026-08-01', 4, 'complete')");
+    const sid = db.exec('SELECT last_insert_rowid()')[0].values[0][0];
+    const blockRow = db.exec('SELECT id, exercise_id FROM block LIMIT 1')[0].values[0];
+    db.run('INSERT INTO set_log (session_id, block_id, exercise_id, side, set_index, reps_done, hit_target, logged_at) '
+      + "VALUES (?,?,?,'left',1,8,1,'2026-08-01T10:00:00Z')", [sid, blockRow[0], blockRow[1]]);
+    db.run("INSERT INTO nightly_log (date, drill, side, value, unit) VALUES ('2026-08-01','Couch stretch','left',90,'sec')");
+
+    // the same statements resetTrainingData issues, minus the IndexedDB work
+    for (const t of ['set_log', 'progression_flag', 'current_load', 'nightly_log', 'session']) {
+      db.run('DELETE FROM ' + t);
+    }
+    db.run("DELETE FROM meta WHERE key IN ('runner_state', 'sessions_at_last_export')");
+
+    const count = (t) => db.exec('SELECT COUNT(*) FROM ' + t)[0].values[0][0];
+    eq('everything logged is gone',
+      [count('set_log'), count('session'), count('nightly_log')], [0, 0, 0]);
+    eq('the exercise library is untouched', count('exercise') > 0, true);
+    eq('so are the day templates and blocks', [count('day_template'), count('block') > 0], [5, true]);
+    eq('the schema version survives — dropping it would break the next launch',
+      db.exec("SELECT value FROM meta WHERE key='schema_version'")[0].values[0][0], '6');
+    eq('the playlist mapping is configuration, not data, and survives',
+      loadConfig(db).main.uri, 'spotify:playlist:37i9dQZF1DX0XUsuxWHRQd');
+    check('the runner position does not survive',
+      db.exec("SELECT value FROM meta WHERE key='runner_state'").length === 0);
+    db.close();
   }
 
   // 25. rest countdown is wall-clock, so a throttled/backgrounded app catches up

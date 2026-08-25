@@ -71,6 +71,30 @@ export function stats() {
   return { ducks, restores, failures, strategy: sessionPlan ? sessionPlan.strategy : null };
 }
 
+export function isDucked() {
+  return !!cycle.ducked;
+}
+
+// Anything that touches playback has to wait for the cue to finish. A playlist
+// switch fired mid-duck would start the new playlist at 25% volume, or — with
+// the pause strategy — start music straight over the top of the cue that just
+// paused it. Queue it and run it when the music is back.
+const pendingWork = [];
+
+export function whenClear(fn) {
+  if (!cycle.ducked) return Promise.resolve(fn());
+  return new Promise((resolve) => {
+    pendingWork.push(() => resolve(fn()));
+  });
+}
+
+function drainPending() {
+  const work = pendingWork.splice(0, pendingWork.length);
+  for (const fn of work) {
+    try { fn(); } catch { /* the caller swallows its own failures */ }
+  }
+}
+
 async function cachedStrategies() {
   return (await idbGet(CACHE_KEY)) || {};
 }
@@ -213,6 +237,7 @@ function scheduleRelease() {
     } catch {
       failures++;
     }
+    drainPending();
   }, wait);
 }
 
@@ -260,6 +285,7 @@ export async function end() {
       restores++;
     } catch { /* the stranded record survives for next launch */ }
   }
+  drainPending();
   sessionPlan = null;
 }
 

@@ -6,6 +6,9 @@ import { buildSteps, stepTarget, remainingSeconds, resumeIndex, progressOf } fro
 import * as audio from '../audio.js';
 import { renderMusic } from './music.js';
 import * as ducking from '../ducking.js';
+import * as spotify from '../spotify.js';
+import { phaseForCategory, loadConfig, isConfigured } from '../playlists.js';
+import { progressRing } from '../charts.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -115,6 +118,32 @@ export function renderRun(root, dayNo) {
     save();
     draw();
     cueFor(steps[index]);
+    musicFor(steps[index]);
+  }
+
+  // ---------- music by session phase (Phase 8) ----------
+  // The switch waits for the cue to finish. Fired mid-duck it would start the
+  // new playlist at 25% volume, or — on the pause strategy — start music
+  // straight over the cue that just paused it.
+  const playlists = loadConfig(db);
+  let musicPhase = null;
+
+  function musicFor(step) {
+    if (!step || !isConfigured(playlists)) return;
+    const phase = phaseForCategory(step.category);
+    if (!phase || phase === musicPhase) return;
+    const entry = playlists[phase];
+    if (!entry || !entry.uri) return;      // nothing mapped: leave the music alone
+    musicPhase = phase;
+    ducking.whenClear(async () => {
+      try {
+        await spotify.player.play(null, entry.uri);
+        await spotify.player.shuffle(entry.shuffle);
+      } catch {
+        // spec Phase 8 gate: a failed switch degrades to "music keeps playing",
+        // never to a stalled session
+      }
+    }).catch(() => {});
   }
 
   // ---------- voice cues ----------
@@ -187,6 +216,7 @@ export function renderRun(root, dayNo) {
       ducking.begin().catch(() => {});
       draw();
       cueFor(steps[index]);
+      musicFor(steps[index]);
     };
     root.append(begin);
 
@@ -269,7 +299,7 @@ export function renderRun(root, dayNo) {
         : effort ? 'one trip — log the weight'
         : tgt.value + ' reps'));
 
-    let clock = null, playBtn = null, staleNote = null;
+    let clock = null, playBtn = null, staleNote = null, holdRing = null;
     // A hold restored from a force-quit whose target already elapsed while the
     // app was dead: nobody knows how long he actually held it, so the clock
     // stops and he confirms the number by hand.
@@ -277,8 +307,11 @@ export function renderRun(root, dayNo) {
       && holdElapsedMs() >= tgt.value * 1000;
     let edited = false;
     if (timed) {
+      const dial = el('div', 'dial dial-hold');
+      holdRing = progressRing({ size: 160, stroke: 9, color: '#ffd75e' });
       clock = el('div', 'holdclock', '');
-      card.append(clock);
+      dial.append(holdRing, clock);
+      card.append(dial);
       playBtn = el('button', 'btn holdbtn', '');
       card.append(playBtn);
       if (stale) {
@@ -389,6 +422,7 @@ export function renderRun(root, dayNo) {
       const left = Math.max(tgt.value - Math.floor(holdElapsedMs() / 1000), 0);
       clock.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
       clock.classList.toggle('running', hold.running);
+      if (holdRing) holdRing.update(tgt.value ? left / tgt.value : 0);
       playBtn.textContent = hold.running ? '⏸  Pause' : '▶  Start';
       if (left === 0 && hold.running && !stale) {
         hold.running = false;
@@ -417,8 +451,11 @@ export function renderRun(root, dayNo) {
     if (!restStartedAt) { restStartedAt = Date.now(); save(); }
     const card = el('section', 'runcard restcard' + (step.main ? ' mainrest' : ''));
     card.append(el('div', 'runside', step.main ? 'MAIN REST' : 'REST'));
+    const dial = el('div', 'dial');
+    const ring = progressRing({ color: step.main ? '#ffd75e' : '#57c7ff' });
     const clock = el('div', 'restclock', '');
-    card.append(clock);
+    dial.append(ring, clock);
+    card.append(dial);
     card.append(el('p', 'muted', step.main ? step.after + ' complete' : 'after ' + step.after));
     if (step.main) card.append(el('p', 'restnext', 'Up next: ' + step.nextCategory));
     const next = steps[index + 1];
@@ -444,6 +481,7 @@ export function renderRun(root, dayNo) {
       const left = remainingSeconds(restStartedAt, step.seconds);
       clock.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
       clock.classList.toggle('done', left === 0);
+      ring.update(step.seconds ? left / step.seconds : 0);
       // keyed to this rest, so coming back to the app late does not replay it
       if (left <= 10 && left > 0 && warnedAt !== restStartedAt && step.seconds > 12) {
         warnedAt = restStartedAt;
