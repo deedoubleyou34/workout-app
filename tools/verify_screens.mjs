@@ -79,8 +79,11 @@ const db = getDb();
 
   const day = await render('day 1', (root) => renderDay(root, 1));
   if (day) {
+    // Day 1 opens on the couch stretch: one left set, one right set. An exact
+    // count catches a bug that collapses several sets into one; "more than
+    // none" would not.
     const buttons = day.querySelectorAll('.setbtn').length;
-    check('day 1 renders set buttons', buttons > 0, buttons + ' buttons');
+    check('day 1 renders one button per prescribed set', buttons === 2, buttons + ' buttons');
     check('day 1 shows the build number', contains(day, 'build'), '');
     check('day 1 shows section tabs', day.querySelectorAll('.tab').length > 0);
   }
@@ -231,6 +234,23 @@ const db = getDb();
       clearAllTimers();
     }
 
+    // The ORDINARY force-quit case: part-way through a hold, not past it. It
+    // shares the branch with the stale one, so it needs its own check.
+    const partway = await openAt(holdAt, 'a hold resumed part-way through renders',
+      { hold: { index: holdAt, startedAt: Date.now() - 30 * 1000, accMs: 0, running: true } });
+    if (partway) {
+      check('a hold resumed part-way through keeps counting rather than warning',
+        !partway.textContent.includes('ran while the app was closed'),
+        partway.textContent.slice(0, 100));
+      const btn = partway.querySelector('.holdbtn');
+      check('and it comes back running, not paused',
+        !!btn && btn.textContent.includes('Pause'), btn && btn.textContent);
+      const done = partway.querySelector('.donebtn');
+      check('and Done is live, because there are seconds worth logging',
+        !!done && !done.disabled && /\d+s held/.test(done.textContent), done && done.textContent);
+      clearAllTimers();
+    }
+
     // the stale-resume branch: a hold whose target elapsed while the app was dead
     const stale = await openAt(holdAt, 'a hold resumed after the app died renders',
       { hold: { index: holdAt, startedAt: Date.now() - 10 * 60 * 1000, accMs: 0, running: true } });
@@ -329,8 +349,23 @@ const db = getDb();
     (lines.length - 1) + ' rows for ' + before.sets + ' sets');
   const commasBalanced = lines.slice(1).every((l) => (l.match(/,/g) || []).length >= 15);
   check('every CSV row carries every column', commasBalanced);
-  check('a value containing a comma would be quoted',
-    /"[^"]*,[^"]*"/.test('a,"b,c",d'), 'escaping rule sanity');
+  // `notes` is the one free-text column, so it is the one that can break the
+  // format. Append a row carrying a comma (set_log stays append-only, even
+  // here) and check the export quotes it rather than inventing a column.
+  // getDb() rather than the handle captured at boot: importBytes swaps the
+  // database out from under everything, which is the whole point of it.
+  getDb().run("INSERT INTO set_log (session_id, block_id, exercise_id, side, set_index, reps_done, "
+    + 'target_reps, hit_target, notes, logged_at) '
+    + "SELECT session_id, block_id, exercise_id, side, 99, reps_done, target_reps, hit_target, "
+    + "'held short, tweaked the setup', logged_at FROM set_log ORDER BY id LIMIT 1");
+  const csv2 = await exportCsvBlob().text();
+  const row = csv2.trim().split(/\r?\n/).find((l) => l.includes('held short'));
+  check('a value with a comma is quoted, not spilled into the next column',
+    !!row && row.includes('"held short, tweaked the setup"'), row && row.slice(-70));
+  check('and the row still has the same number of columns as the header',
+    !!row && row.replace(/"[^"]*"/g, 'X').split(',').length
+      === csv2.trim().split(/\r?\n/)[0].split(',').length,
+    row && String(row.replace(/"[^"]*"/g, 'X').split(',').length));
 }
 
 // ---------------------------------------------------------------- second boot
