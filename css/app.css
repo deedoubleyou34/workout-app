@@ -914,3 +914,56 @@ html, body {
 .open .daytabhint { flex: 1; }
 .daydrawer { display: none; flex-direction: column; gap: 10px; margin-top: 10px; }
 .open .daydrawer { display: flex; }
+
+/* ---- build 026: the dashboard, one body part at a time ----
+   Dom, 2026-08-25: "categorize each measured excercise by body category...
+   readable portrait from a drop down menu if clicked otherwise show only 1
+   body category and make it scroll sideways."
+
+   The RAIL scrolls sideways. The charts inside each card still do not — they
+   scale to their card, so nothing is ever cut off mid-line. */
+.partpicker { margin: 6px 0 4px; }
+.partselect {
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--edge);
+  border-left: 3px solid var(--tier, var(--gold));
+  background: var(--card);
+  color: var(--fg);
+  font-size: 1rem;
+  font-weight: 700;
+  /* the native picker is the readable-in-portrait one Dom asked for, so keep
+     iOS's own wheel rather than reimplementing it */
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--tier, var(--gold)) 50%),
+                    linear-gradient(135deg, var(--tier, var(--gold)) 50%, transparent 50%);
+  background-position: right 18px center, right 13px center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.partnote { font-size: 0.74rem; margin-top: 6px; }
+
+.partrail {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  /* the rail bleeds to the screen edges so a card can sit centred with the
+     next one peeking, which is what makes it read as swipeable */
+  margin: 0 -14px 18px;
+  padding: 2px 14px 10px;
+  scrollbar-width: none;
+}
+.partrail::-webkit-scrollbar { display: none; }
+.partrail .trendcard {
+  flex: 0 0 88%;
+  scroll-snap-align: center;
+  margin: 0;
+}
+/* one exercise in a body part: no peek, nothing to swipe to */
+.partrail .trendcard:only-child { flex: 0 0 100%; }

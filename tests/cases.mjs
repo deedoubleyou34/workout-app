@@ -20,6 +20,8 @@ import { capacityOf, bestCapacity, gapPct, weeklySeries,
          verdictFor } from '../js/asymmetry.js';
 import { niceBounds } from '../js/charts.js';
 import { powerParts, powerFrom, tierFor, tierGoalText, TIERS, WEIGHTS } from '../js/power.js';
+import { bodyPartFor, groupByBodyPart, defaultBodyPart, BODY_PARTS } from '../js/bodyparts.js';
+import { EXERCISES } from '../js/seed.js';
 import { parseContext, contextUrl, phaseForCategory, emptyConfig, loadConfig, saveConfig,
          sourceFor, isConfigured, defaultShuffle, sourceLabel, explainCategory,
          PHASES, CATEGORIES } from '../js/playlists.js';
@@ -1009,6 +1011,55 @@ export async function run(ctx) {
     check('a finished session is never offered as resumable',
       (resumableSession(db) || {}).day_no !== 2);
     db.close();
+  }
+
+  // 24d. the dashboard's body-part drawers (Dom, 2026-08-25)
+  {
+    // Every seeded exercise must land somewhere deliberate. 'other' is a real
+    // drawer rather than a crash, but nothing in the program should need it —
+    // an exercise falling through means the map was not updated with the seed.
+    const homeless = EXERCISES.map(([name]) => name).filter((n) => bodyPartFor(n) === 'other');
+    eq('every seeded exercise has a body part', homeless, []);
+
+    // The seed's own `category` says what an exercise is FOR, not what it
+    // moves. These two are both 'corrective' and belong in different drawers —
+    // which is the whole reason this map exists rather than reusing it.
+    eq('Copenhagen plank is adductor work, not core', bodyPartFor('Copenhagen plank'), 'hips');
+    eq('Pallof press is core', bodyPartFor('Pallof press'), 'core');
+    eq('an unknown name lands in a visible drawer, not nowhere',
+      bodyPartFor('Something Dom invented'), 'other');
+
+    // Grouping keeps BODY_PARTS order and never offers an empty drawer.
+    const groups = groupByBodyPart([
+      { name: 'Prone Y-T-W' },
+      { name: 'Single-leg RDL (DB)' },
+      { name: 'Banded clamshells' },
+      { name: 'ATG split squat (front foot on low board)' },
+    ]);
+    eq('groups come back in body order, not in the order they arrived',
+      groups.map((g) => g.key), ['legs', 'hips', 'shoulders']);
+    eq('and each carries its own exercises',
+      groups.map((g) => g.items.length), [2, 1, 1]);
+    check('an empty body part is never offered',
+      groups.every((g) => g.items.length > 0));
+    eq('nothing to group is an empty list, not a crash', groupByBodyPart([]), []);
+    eq('and neither is nothing at all', groupByBodyPart(null), []);
+
+    // The drawer that opens is the one holding the loudest verdict, because
+    // unilateralTrends() already sorts widening and stuck gaps to the front.
+    const ordered = [{ name: 'Banded clamshells' }, { name: 'Single-leg RDL (DB)' }];
+    eq('the drawer that opens is the one with the worst gap in it',
+      defaultBodyPart(groups, ordered), 'hips');
+    eq('with nothing to rank it opens the first drawer',
+      defaultBodyPart(groups, []), 'legs');
+    // A trend whose exercise is not in these groups must not open a drawer
+    // that is not on screen.
+    eq('an exercise outside the groups does not select a missing drawer',
+      defaultBodyPart(groups, [{ name: 'Doorway pec stretch' }]), 'legs');
+    check('no groups means no selection at all', defaultBodyPart([], ordered) === null);
+
+    check('every body part has a human label',
+      BODY_PARTS.every((p) => p.label && p.label !== p.key));
   }
 
   // 25. rest countdown is wall-clock, so a throttled/backgrounded app catches up

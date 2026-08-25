@@ -22,6 +22,7 @@ const SHELL = [
   './js/ui/picker.js',
   './js/playlists.js',
   './js/asymmetry.js',
+  './js/bodyparts.js',
   './js/charts.js',
   './js/ui/day.js',
   './js/progression.js',

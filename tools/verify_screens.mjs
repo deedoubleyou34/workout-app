@@ -507,8 +507,78 @@ const db = getDb();
       home.querySelector('.legendrows .legendrow').textContent);
   }
 
+  // The dashboard's real shape needs COMPLETE sessions with both sides logged
+  // across more than one week, which nothing above produces. Build that here
+  // rather than assert on an empty screen and call it covered.
+  {
+    const slRdl = query("SELECT id FROM exercise WHERE name = 'Single-leg RDL (DB)'")[0].id;
+    const copen = query("SELECT id FROM exercise WHERE name = 'Copenhagen plank'")[0].id;
+    const scap = query("SELECT id FROM exercise WHERE name = 'DB scaption raise'")[0].id;
+    const blockFor = (exId) => query('SELECT id FROM block WHERE exercise_id = ? LIMIT 1', [exId])[0].id;
+
+    // two weeks apart, so weeklySeries has something to trend
+    const weeks = ['2026-08-03', '2026-08-10'];
+    for (const [w, date] of weeks.entries()) {
+      getDb().run("INSERT INTO session (date, day_no, status, started_at) "
+        + "VALUES (?, 4, 'complete', ?)", [date, date + 'T18:00:00Z']);
+      const sid = query('SELECT id FROM session ORDER BY id DESC LIMIT 1')[0].id;
+      const put = (exId, side, reps, weight, hold) => getDb().run(
+        'INSERT INTO set_log (session_id, block_id, exercise_id, side, set_index, weight_lb, '
+        + 'reps_done, hold_seconds_done, hit_target, logged_at) VALUES (?,?,?,?,1,?,?,?,1,?)',
+        [sid, blockFor(exId), exId, side, weight, reps, hold, date + 'T18:10:00Z']);
+      // a loaded pair, a timed pair, and a shoulder pair — three different
+      // body parts, which is the whole point of the drawer
+      put(slRdl, 'left', 8, 40 + w * 10, null);
+      put(slRdl, 'right', 8, 50 + w * 5, null);
+      put(copen, 'left', null, null, 30 + w * 10);
+      put(copen, 'right', null, null, 45, null);
+      put(scap, 'left', 12, 10 + w * 2, null);
+      put(scap, 'right', 12, 15, null);
+    }
+  }
+
   const dash = await render('dashboard (with a session logged)', (root) => renderDashboard(root));
-  if (dash) check('the dashboard renders with real rows behind it', dash.textContent.length > 50);
+  if (dash) {
+    check('the dashboard renders with real rows behind it', dash.textContent.length > 50);
+    check('and it drew actual trend cards', dash.querySelectorAll('.trendcard').length > 0,
+      dash.querySelectorAll('.trendcard').length + ' cards');
+
+    // ---- build 026: one body part at a time, picked from a drop-down ----
+    const select = dash.querySelector('.partselect');
+    check('the dashboard offers a body-part drop-down', !!select);
+    if (select) {
+      const options = select.querySelectorAll('option').map((o) => o.textContent);
+      check('the drop-down lists more than one body part',
+        options.length > 1, options.join(' | '));
+      check('it names them in plain English rather than by key',
+        options.some((o) => /Legs|Hips|Shoulders/.test(o)), options.join(' | '));
+      check('it never offers a body part with nothing in it',
+        options.every((o) => !/\(0\)/.test(o)), options.join(' | '));
+
+      // Only one drawer is on screen, and its cards live on the sideways rail.
+      const rail = dash.querySelector('.partrail');
+      check('the visible cards are all on the sideways rail',
+        rail && dash.querySelectorAll('.trendcard').length
+          === rail.querySelectorAll('.trendcard').length,
+        dash.querySelectorAll('.trendcard').length + ' on screen, '
+          + (rail ? rail.querySelectorAll('.trendcard').length : 0) + ' on the rail');
+
+      // Switching drawers must actually change what is drawn.
+      const firstNames = rail.querySelectorAll('.trendname').map((n) => n.textContent).join(',');
+      const other = select.querySelectorAll('option')
+        .find((o) => o.value !== select.value);
+      if (other) {
+        select.value = other.value;
+        select.dispatch('change');
+        const nextNames = rail.querySelectorAll('.trendname').map((n) => n.textContent).join(',');
+        check('picking another body part swaps the cards out',
+          nextNames !== firstNames && nextNames.length > 0,
+          firstNames + '  ->  ' + nextNames);
+      }
+      check('the volume and nightly sections survive a body-part switch',
+        contains(dash, 'Weekly sets by side') && contains(dash, 'Nightly non-negotiables'));
+    }
+  }
 
   const day = await render('day 1 (with a session in progress)', (root) => renderDay(root, 1));
   if (day) check('a day with logged sets renders', day.querySelectorAll('.setbtn').length > 0);

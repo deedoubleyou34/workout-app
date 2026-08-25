@@ -9,6 +9,7 @@ import { getDb } from '../db.js';
 import { unilateralTrends, weeklyVolumeBySide, couchStretchTrend } from '../asymmetry.js';
 import { lineChart, barChart, legend } from '../charts.js';
 import { nightlyStreak, weekStart, today } from '../sessions.js';
+import { groupByBodyPart, defaultBodyPart, BODY_PART_LABELS } from '../bodyparts.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -56,7 +57,55 @@ export function renderDashboard(root) {
     return;
   }
 
-  for (const t of trends) {
+  // ---- one body part at a time, chosen from a drop-down ----
+  //
+  // Dom, 2026-08-25: the screen was one long column of every unilateral
+  // exercise. Now it shows a single body part, its cards scroll sideways, and
+  // the drop-down is the way to the others. `trends` is still sorted loudest
+  // first, so the part that opens is the one carrying the worst gap.
+  const groups = groupByBodyPart(trends);
+  let openPart = defaultBodyPart(groups, trends);
+
+  const picker = el('div', 'partpicker');
+  const select = document.createElement('select');
+  select.className = 'partselect';
+  for (const g of groups) {
+    const opt = document.createElement('option');
+    opt.value = g.key;
+    opt.textContent = g.label + ' (' + g.items.length + ')';
+    if (g.key === openPart) opt.selected = true;
+    select.append(opt);
+  }
+  picker.append(select);
+  const partNote = el('p', 'muted partnote', '');
+  picker.append(partNote);
+  root.append(picker);
+
+  const rail = el('div', 'partrail');
+  root.append(rail);
+
+  function drawPart() {
+    rail.innerHTML = '';
+    const group = groups.find((g) => g.key === openPart) || groups[0];
+    if (!group) return;
+    partNote.textContent = group.items.length === 1
+      ? 'One exercise in ' + (BODY_PART_LABELS[group.key] || group.label).toLowerCase() + '.'
+      : group.items.length + ' exercises — swipe sideways for the rest.';
+    for (const t of group.items) rail.append(trendCard(t));
+  }
+  select.onchange = () => {
+    openPart = select.value;
+    drawPart();
+  };
+  drawPart();
+
+  // ---- weekly volume by side: is the bias actually happening? ----
+  renderVolume(root, db);
+  renderNightly(root, db);
+}
+
+// One exercise's card: the verdict, the capacity chart, and the gap trend.
+function trendCard(t) {
     const card = el('section', 'blockcard trendcard');
     card.append(el('h3', 'trendname', t.name));
 
@@ -102,10 +151,11 @@ export function renderDashboard(root) {
       }
     }
     card.append(el('p', 'muted', t.sessions + (t.sessions === 1 ? ' session' : ' sessions') + ' logged'));
-    root.append(card);
-  }
+    return card;
+}
 
-  // ---- weekly volume by side: is the bias actually happening? ----
+// ---- weekly volume by side: is the bias actually happening? ----
+function renderVolume(root, db) {
   const volume = weeklyVolumeBySide(db);
   if (volume.length) {
     const card = el('section', 'blockcard');
@@ -128,8 +178,6 @@ export function renderDashboard(root) {
     }
     root.append(card);
   }
-
-  renderNightly(root, db);
 }
 
 // Spec Phase 7 step 5: the nightly non-negotiables get their own section and
