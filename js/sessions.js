@@ -128,37 +128,86 @@ export function clearRunnerState(db) {
   db.run("DELETE FROM meta WHERE key = 'runner_state'");
 }
 
+// Where the runner parked itself, whichever session that was.
+function parkedState(db) {
+  const raw = rows(db, "SELECT value FROM meta WHERE key = 'runner_state'")[0];
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw.value);
+  } catch {
+    return null;
+  }
+}
+
+// Has work actually happened in this session? A logged set, or the runner
+// parked past the first step. This is the whole distinction Dom asked for:
+// status = 'in_progress' on its own does NOT mean a session is live, because
+// renderRun() opens one the moment the runner is entered — so merely tapping
+// into a day to look at it leaves an in-progress session behind with nothing
+// in it, which is exactly the "session that was only viewed".
+function workInSession(db, session, parked) {
+  const sets = rows(db, 'SELECT COUNT(*) c FROM set_log WHERE session_id = ?', [session.id])[0].c;
+  const atStep = parked && parked.session_id === session.id ? (parked.index || 0) : 0;
+  return { sets, live: sets > 0 || atStep > 0 };
+}
+
+// In-progress sessions for a day (or every day), newest first.
+function openSessions(db, dayNo = null) {
+  return dayNo == null
+    ? rows(db, "SELECT * FROM session WHERE status = 'in_progress' AND day_no > 0 "
+      + 'ORDER BY date DESC, id DESC')
+    : rows(db, "SELECT * FROM session WHERE status = 'in_progress' AND day_no = ? "
+      + 'ORDER BY date DESC, id DESC', [dayNo]);
+}
+
 // The session the home screen offers to resume, or null.
 //
 // Dom, 2026-08-25: "Resume session section should only pop up when there is a
 // logged active live session (not a session that was only viewed)."
 //
-// status = 'in_progress' on its own does NOT mean that. renderRun() opens a
-// session the moment the runner is entered, so merely tapping into a day to
-// look at it leaves an in-progress session behind with nothing in it. A
-// session is live when work has actually happened in it: a set is logged, or
-// the runner is parked past the first step.
-//
 // Deliberately NOT scoped to today. A session started at 11pm and force-quit
 // is exactly the one worth resuming, and it is yesterday's by the time he
 // picks the phone up.
 export function resumableSession(db) {
-  let parked = null;
-  const raw = rows(db, "SELECT value FROM meta WHERE key = 'runner_state'")[0];
-  if (raw) {
-    try { parked = JSON.parse(raw.value); } catch { parked = null; }
-  }
-  const open = rows(db,
-    "SELECT * FROM session WHERE status = 'in_progress' AND day_no > 0 " +
-    'ORDER BY date DESC, id DESC');
-  for (const s of open) {
-    const sets = rows(db, 'SELECT COUNT(*) c FROM set_log WHERE session_id = ?', [s.id])[0].c;
-    const atStep = parked && parked.session_id === s.id ? (parked.index || 0) : 0;
-    if (!sets && atStep <= 0) continue;              // opened, never worked
+  const parked = parkedState(db);
+  for (const s of openSessions(db)) {
+    const { sets, live } = workInSession(db, s, parked);
+    if (!live) continue;
     const day = rows(db, 'SELECT name FROM day_template WHERE day_no = ?', [s.day_no])[0];
     return { ...s, sets, name: day ? day.name : '', daysAgo: daysBetween(s.date, today()) };
   }
   return null;
+}
+
+// The session the RUNNER should open for a day.
+//
+// This must agree with resumableSession() or the resume card is a lie. It used
+// to be currentSession(), which is scoped to `date = today()`: the card would
+// offer last night's force-quit session, the tap would find nothing for today,
+// a brand-new empty session would be created, and the night's work would be
+// left behind with the old session sitting in_progress forever.
+//
+// In order:
+//   1. an in-progress session for this day WITH WORK IN IT, whatever date it
+//      carries — that is the one the card is pointing at
+//   2. today's own in-progress session even if it is empty (he opened the
+//      runner a minute ago, backed out, and came straight back)
+//   3. nothing to resume: start a fresh one, and park any stale empty session
+//      first so it does not sit in_progress for the rest of time
+export function runnerSession(db, dayNo) {
+  const parked = parkedState(db);
+  const open = openSessions(db, dayNo);
+
+  for (const s of open) {
+    if (workInSession(db, s, parked).live) return { session: s, resumed: true };
+  }
+  const todays = open.find((s) => s.date === today());
+  if (todays) return { session: todays, resumed: false };
+
+  // Empty and not from today: it can never be resumed and nothing points at
+  // it, so close it rather than leave it open behind the new one.
+  for (const s of open) abandonSession(db, s.id);
+  return { session: startSession(db, dayNo), resumed: false };
 }
 
 // What each day looks like on the home list.

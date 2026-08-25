@@ -5,6 +5,7 @@ import { readFileSync } from 'fs';
 import { seed, EXERCISES, DAYS } from '../js/seed.js';
 import { buildSteps, stepTarget } from '../js/runner.js';
 import { setText, restText, cueId, slug, hasSecondsClip } from '../js/cues.js';
+import { MIN_CUE_MS } from '../js/ducking.js';
 
 const require = createRequire(import.meta.url);
 const initSqlJs = require('../vendor/sql-wasm.js');
@@ -264,6 +265,26 @@ check('nightly holds: only left-calf 90s and closing couch 120s exceed 60s', all
     const durations = Object.values(manifest).map((c) => c.ms);
     check('no zero-length clips', durations.every((d) => d > 0),
       String(durations.filter((d) => !d).length) + ' zero-length');
+
+    // ---- the ducking floor (build 025) ----
+    //
+    // A cue under MIN_CUE_MS plays over the music instead of pausing it. That
+    // is meant to catch exactly one thing: the word "go". If a re-render at a
+    // different rate ever pushed a real announcement under the floor, that
+    // announcement would quietly stop ducking and nobody would find out until
+    // Dom could not hear it in the gym.
+    const sentences = Object.keys(cues).filter((id) => id.startsWith('c_'));
+    const tooShort = sentences.filter((id) => manifest[id] && manifest[id].ms < MIN_CUE_MS);
+    check('every whole-sentence cue is long enough to duck the music',
+      tooShort.length === 0,
+      tooShort.slice(0, 3).map((id) => id + ' ' + manifest[id].ms + 'ms').join(', '));
+    check('"go" is still short enough NOT to',
+      manifest.s_go && manifest.s_go.ms < MIN_CUE_MS,
+      manifest.s_go && manifest.s_go.ms + 'ms vs floor ' + MIN_CUE_MS);
+    // The ten-second warning is a real cue and must keep ducking.
+    check('the ten-second warning still ducks',
+      manifest.s_ten_seconds && manifest.s_ten_seconds.ms >= MIN_CUE_MS,
+      manifest.s_ten_seconds && manifest.s_ten_seconds.ms + 'ms');
   }
 }
 

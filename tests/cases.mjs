@@ -9,7 +9,7 @@ import { ruleFor, isSessionHit, trailingStreak, evaluate,
          computeFlags, acceptFlag, acceptAll, declineFlag, snoozeFlag, pendingFlags } from '../js/progression.js';
 import { seed } from '../js/seed.js';
 import { nextDayUp, startOver, currentSession, finishSession, startSession, logSet,
-         saveRunnerState, resumableSession } from '../js/sessions.js';
+         saveRunnerState, resumableSession, runnerSession } from '../js/sessions.js';
 import { buildSteps, remainingSeconds, resumeIndex, progressOf, stepTarget, isTimedStep,
          MAIN_REST_FLOOR } from '../js/runner.js';
 import { setText, restText, restIsSilent, cueId, spokenSeconds, hasSecondsClip } from '../js/cues.js';
@@ -1010,6 +1010,68 @@ export async function run(ctx) {
     finishSession(db, worked.id);
     check('a finished session is never offered as resumable',
       (resumableSession(db) || {}).day_no !== 2);
+    db.close();
+  }
+
+  // 24e. the card and the runner must agree, or Resume is a lie.
+  //
+  // This is the bug the card shipped with: resumableSession is deliberately
+  // not scoped to today, and the runner's old currentSession() was. A session
+  // started at 11pm and force-quit was offered on the home screen, and tapping
+  // Resume opened a BRAND-NEW empty session for today — the night's work
+  // stranded, the old session in_progress forever.
+  {
+    const SQL = await ctx.initSqlJs();
+    const db = new SQL.Database();
+    db.run(await ctx.loadSchema());
+    seed(db);
+
+    const yesterday = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+        + '-' + String(d.getDate()).padStart(2, '0');
+    })();
+
+    const block = db.exec('SELECT b.id, b.exercise_id FROM block b JOIN day_template d '
+      + 'ON d.id = b.day_template_id WHERE d.day_no = 3 LIMIT 1')[0].values[0];
+    db.run("INSERT INTO session (date, day_no, status, started_at) VALUES (?, 3, 'in_progress', ?)",
+      [yesterday, yesterday + 'T23:10:00Z']);
+    const lastNight = db.exec('SELECT id FROM session ORDER BY id DESC LIMIT 1')[0].values[0][0];
+    logSet(db, { session_id: lastNight, block_id: block[0], exercise_id: block[1],
+      side: 'left', set_index: 1, reps_done: 8, target_reps: 8, hit_target: 1 });
+
+    const offered = resumableSession(db);
+    eq('the card offers last night\u2019s force-quit session', offered && offered.id, lastNight);
+
+    const opened = runnerSession(db, 3);
+    eq('and the runner opens THAT session, not a new one for today',
+      opened.session.id, lastNight);
+    check('the runner knows it is resuming', opened.resumed === true);
+    eq('nothing extra was created', db.exec('SELECT COUNT(*) FROM session')[0].values[0][0], 1);
+
+    // Same day, opened and backed out of: still the same session, not a second.
+    const fresh = runnerSession(db, 4);
+    const again = runnerSession(db, 4);
+    eq('re-entering a day opened a minute ago reuses its session',
+      again.session.id, fresh.session.id);
+    check('and an empty one is not called a resume', again.resumed === false);
+
+    // A stale EMPTY session cannot be resumed and nothing points at it, so it
+    // must be closed rather than left in_progress behind the new one.
+    db.run("UPDATE session SET date = ? WHERE id = ?", [yesterday, fresh.session.id]);
+    const replacement = runnerSession(db, 4);
+    check('a stale empty session is not adopted', replacement.session.id !== fresh.session.id);
+    eq('it is parked rather than left open forever',
+      db.exec('SELECT status FROM session WHERE id = ?', [fresh.session.id])[0].values[0][0],
+      'abandoned');
+    check('and it stops being offered on the home screen',
+      (resumableSession(db) || {}).id !== fresh.session.id);
+
+    // Finishing through the runner closes the card down for good.
+    finishSession(db, lastNight);
+    check('once finished, last night is no longer offered',
+      (resumableSession(db) || {}).id !== lastNight);
     db.close();
   }
 

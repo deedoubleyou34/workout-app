@@ -1,6 +1,6 @@
 # Where I left off — Hyperbolic Time Chamber
 
-**Last updated:** 2026-08-25 · **Live build:** 026 · **Status:** every phase in the spec (0–8) is built. Every note you wrote in the three review files has been worked through, and those files are now folded into this one.
+**Last updated:** 2026-08-25 · **Live build:** 027 · **Status:** every phase in the spec (0–8) is built. Every note you wrote in the three review files has been worked through, and those files are now folded into this one.
 
 This is the only handover doc now, apart from **`MUSIC-NOTES.md`**, which covers the in-app music picker and still has its own open gate — see the bottom of this file.
 
@@ -35,6 +35,10 @@ The runner opens a session the moment you enter it. So tapping into a day to *lo
 So the card wants **work to have actually happened**: a logged set, or the runner parked past the first step. It is also deliberately **not** limited to today — a session started at 11pm and force-quit is precisely the one worth resuming, and it is yesterday's by the time you pick the phone up.
 
 When there is nothing to resume, that space belongs to the slim music bar, which is always there.
+
+**And a second trap underneath the first, which I want to own rather than bury.** I shipped that card working and the *tap* broken, for one commit. The card is deliberately not limited to today; the runner was still asking for today's session only. So the card would offer last night's force-quit session, you would tap Resume, the runner would find nothing for today, start a brand-new empty session — and your night's work would be stranded with the old session sitting open forever. Fixed: the runner and the card now share one definition of which session is live, and there is a test that goes from one to the other, because the test that only checked the card passed the whole time.
+
+A stale *empty* session — a day you opened weeks ago and never worked — is closed out rather than left open behind the new one.
 
 ---
 
@@ -86,7 +90,7 @@ That was always true; the legend is just the first thing to say it out loud. I d
 | Local repo | `Projects/Workout/workout-app/` — standalone git repo, pushes straight to Pages |
 | Spotify Client ID | `cf46be5104434a87948db209215d61f7` (redirect URI = the Pages URL exactly; no secret, PKCE) |
 | Name | **Hyperbolic Time Chamber** (icon label "Chamber") |
-| Test suite | **229 cases** + 5 pre-deploy checks. On the phone, expect **ALL 229 TESTS PASSED** |
+| Test suite | **239 cases** + 100 screen checks + 5 pre-deploy commands. On the phone, expect **ALL 239 TESTS PASSED** |
 
 The parent folder holds reference copies of `workout_plan.txt`, `PROJECT_SPEC.md`, `CLAUDE.md`. **The copies inside `workout-app/` are canonical** — the parent copies are synced at phase boundaries.
 
@@ -126,7 +130,7 @@ Grouped by what you have to be holding to do it. Everything already ticked off i
 
 ### At the phone, thirty seconds each
 
-- [ ] **Run the tests in Safari.** Home → *Run progression tests →*. Expect **ALL 229 TESTS PASSED**.
+- [ ] **Run the tests in Safari.** Home → *Run progression tests →*. Expect **ALL 239 TESTS PASSED**.
 - [ ] **The home screen.** Resume card, slim music bar, All-days drop-down, Next up below it. Does the order read right?
 - [ ] **The power ladder.** Are the forms in the right places, and do you want to answer the nightly-weight question above?
 - [ ] **The dashboard drop-down.** Open it and swipe. It will still be thin on data — I am asking whether it looks right, not whether it says anything yet.
@@ -143,6 +147,7 @@ For just looking at numbers, **Export .csv** is easier: one flat row per logged 
 
 - [ ] **Build four Spotify playlists** (warm-up, main work, power, finisher) and paste them into Settings. This is the only thing blocking Phase 8, and it is a hard dependency on you.
 - [ ] Then work the Phase 8 gate: the playlist **changes at each phase boundary**; the switch never interrupts the timer or the cue; deleting a mapped playlist in Spotify lets the session carry on with the old music rather than stalling; shuffle is on for main work and off for power.
+- [ ] **Reconnect Spotify once** (Home → Music) so the in-app picker can read your library — `MUSIC-NOTES.md` has the detail. Do it **after** Start fresh, or leave that screen's "also disconnect Spotify" box unticked, or you will authorise twice for nothing.
 - [ ] **Settings → Start fresh → Delete all training data** on the day you begin. It erases every session, set, nightly entry and accepted load, and keeps the exercise library, day templates and playlist mapping. Two confirmations, and it offers a backup first. Press it deliberately — I did not wire it to anything automatic.
 - [ ] **Export a .sqlite backup when the home screen asks.** After 10 sessions with no backup there is a card you cannot miss. Twice over three weeks is nothing, and it is the difference between having the data and not — Safari can evict this app's storage without warning.
 
@@ -244,7 +249,7 @@ Forgetting the `CACHE` bump means phones keep serving the old shell from cache.
 
 | | |
 |---|---|
-| `run_tests.mjs` | the 229 logic cases — progression rules, step ordering, cue text, ducking, the power ladder, body parts |
+| `run_tests.mjs` | the 239 logic cases — progression rules, step ordering, cue text, ducking, the power ladder, body parts |
 | `verify_seed.mjs` | every line the app can say has a clip, including the ones an accepted progression can reach |
 | `verify_migration.mjs` | after a reseed, every logged set still points at its original (day, exercise, occurrence) |
 | `verify_imports.mjs` | every named import resolves — the screen modules are not run by any test, so a renamed export there is a blank screen — **and** every shipped file is in the service worker's precache list |

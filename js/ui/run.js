@@ -1,6 +1,6 @@
 import { query, getDb, persist } from '../db.js';
 import { computeFlags } from '../progression.js';
-import { currentSession, startSession, finishSession, logSet,
+import { runnerSession, finishSession, logSet,
          saveRunnerState, loadRunnerState, clearRunnerState } from '../sessions.js';
 import { buildSteps, stepTarget, remainingSeconds, resumeIndex, progressOf } from '../runner.js';
 import * as audio from '../audio.js';
@@ -59,11 +59,12 @@ export function renderRun(root, dayNo) {
     return;
   }
 
-  let session = currentSession(db, dayNo);
-  if (!session || session.status !== 'in_progress') {
-    session = startSession(db, dayNo);
-    persist();
-  }
+  // runnerSession, not currentSession: the latter is scoped to today, so a
+  // session started before midnight and force-quit was invisible here while
+  // the home screen was still offering to resume it.
+  const opened = runnerSession(db, dayNo);
+  const session = opened.session;
+  persist();
 
   // ---------- build the step list ----------
   const blocks = query(

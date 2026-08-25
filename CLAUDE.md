@@ -92,6 +92,82 @@ Do not scaffold future phases "while you're in there." The gates exist because i
 
 Running record of audit findings and decisions made as phases progress. Newest first. Add an entry whenever a phase surfaces something that changes the plan, the spec, or how we work.
 
+### 2026-08-25 — Dom's marked-up notes worked through (builds 025, 026)
+
+**Current state, so the next session does not have to reconstruct it:** schema
+at **v6**, TTS at **+24%**, warm-up rests **15 s and silent**, suite at **239
+cases** plus **~90 screen checks**, five pre-deploy commands, and **one**
+handover doc (`WHERE-I-LEFT-OFF.md`) plus `MUSIC-NOTES.md`. `PHASE-6-7-NOTES.md`
+and `PHASE-8-NOTES.md` are merged into the handover and deleted — older entries
+in this log still reference them, which is fine, they are history.
+
+Two new modules: `js/power.js` (the power-level ladder) and `js/bodyparts.js`
+(exercise → body part, presentational only).
+
+**Silence is a property of the category, not of the length.** Dom wanted 15 s
+warm-up gaps with nothing said in them but "go". Bumping the seed from 5 s to
+15 s does the opposite of that on its own: `restText`'s old rule was
+`seconds < 10`, so at 15 s the gaps would have *started* talking, and the
+runner's ten-second warning fires above `seconds > 12` so that would have come
+back too. `restIsSilent(seconds, { main, category })` is now the single place
+that decides, and `gen_cues.mjs`, `verify_seed.mjs`, `audio.cueIdsFor` and the
+runner all ask it — otherwise the generator renders a clip for a line the app
+can never say, or the verifier calls a silent rest a missing one.
+
+**A cue under 900 ms no longer ducks.** Dom: "the music pauses a bit longer
+before saying go and starts 10 to 15 ms after the word go which is a bit
+choppy." His device runs the pause strategy, and `MIN_CYCLE_MS` was holding a
+song paused 1.5 s for a 576 ms word. The floor is on the CUE, not the cycle —
+every whole-sentence clip renders at 1776 ms or more, so nothing real lost its
+duck, and `verify_seed.mjs` now asserts exactly that in both directions so a
+re-render at a different rate cannot quietly move a real announcement under it.
+
+**`status = 'in_progress'` is not "a live session", and it is not "the session
+to open" either.** Dom asked for a resume card that ignores "a session that was
+only viewed". `renderRun` opens a session the moment the runner is entered, so
+looking at a day *creates* the thing to exclude — hence `resumableSession`,
+which wants a logged set or the runner parked past step one.
+
+That fix opened a second one that shipped broken for a commit and is worth
+remembering as a shape: **a detector and its consumer disagreeing about scope.**
+`resumableSession` is deliberately not date-scoped (a session force-quit at 11pm
+is the one worth resuming, and it is yesterday's by morning), but `renderRun`
+was still calling `currentSession`, which is `WHERE date = today()`. The card
+offered last night's session; the tap found nothing; a new empty session was
+created; the night's work was stranded and the old session sat `in_progress`
+forever. `runnerSession()` is now the runner's way in and shares the
+"has work in it" test with the card. **The unit test that only exercises one
+side of a pair like this proves nothing** — 24c passed the whole time.
+
+**The power ladder is tuned to the seed, not to canon.** Canonically SSJ is
+base ×50 and God is past ×5,000; scaled off a week of this program that is
+unreachable in a year. So the thresholds are set against what the seed actually
+scores (one training day ~19,000, four ~74,000) and what is kept from the source
+is the *shape*: every form costs more than the last, asserted in a test. If the
+program's volume ever changes materially, that test is the thing that will say
+the ladder needs re-tuning.
+
+**The legend surfaced a live question rather than a bug.** A night is worth 50
+and a set is worth 100, so a perfect seven-night streak moves a week by 350
+against a training day's 19,000 — the nightly non-negotiables are invisible in
+the power level. Always true; the legend is just the first thing to say it out
+loud. Left alone and asked in the handover, because changing a weight silently
+would move Dom's all-time number too.
+
+**Two harness holes, both found by writing checks that could fail.**
+`tools/domstub.mjs` had `style` as a bare object (no `setProperty`) and no
+descendant combinators — it read `.a .b` as one element carrying both classes
+and answered `0`, which looks exactly like an app bug. And nothing checked that
+a shipped file was in the service worker's `SHELL`: `js/power.js` was not, which
+is a blank home screen in a gym with no wifi. `verify_imports.mjs` now checks
+every shipped file, and it caught `js/bodyparts.js` the same day.
+
+**Answered and closed, so they do not get re-litigated:** no set number in cues,
+no weight in cues, no spoken summary, and the Done tap on rep-based warm-up
+drills stays (Dom: "for accountability"). The zero-tap warm-up is therefore
+*not* happening — which is the right answer anyway, since it meant writing reps
+to `set_log` he never confirmed.
+
 ### 2026-08-25 — Music you pick in the app (build 023)
 
 Dom, after using Phase 8: *"the option to choose a playlist for each workout category **or** the option to select an entire album for each category… the freedom to adjust the music directly in the app."* Three limitations behind that, all addressed.
