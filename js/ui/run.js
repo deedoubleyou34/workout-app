@@ -5,6 +5,7 @@ import { currentSession, startSession, finishSession, logSet,
 import { buildSteps, stepTarget, remainingSeconds, resumeIndex, progressOf } from '../runner.js';
 import * as audio from '../audio.js';
 import { renderMusic } from './music.js';
+import * as ducking from '../ducking.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -120,15 +121,21 @@ export function renderRun(root, dayNo) {
   function cueFor(step) {
     if (!step || !audio.isUnlocked()) return;
     if (step.kind === 'set') {
-      audio.play(audio.announceSet({
+      say(audio.announceSet({
         name: step.label, side: step.side, ...targetOf(step),
         setIndex: step.setIndex, totalSets: step.totalSets,
       }));
     } else if (step.kind === 'rest') {
-      audio.play(audio.announceRest(step.seconds, { main: step.main }));
+      say(audio.announceRest(step.seconds, { main: step.main }));
     } else if (step.kind === 'summary') {
-      audio.play(audio.CUE_COMPLETE);
+      say(audio.CUE_COMPLETE);
     }
+  }
+
+  // One way in for every cue: the music dips (or pauses) around it and comes
+  // back. A silent session returns 0 ms from play() and never ducks at all.
+  function say(ids) {
+    ducking.speakOver(() => audio.play(ids)).catch(() => {});
   }
 
   // decode the clips this session will actually use, so the first cue is on time
@@ -175,6 +182,9 @@ export function renderRun(root, dayNo) {
       await audio.unlock();
       preloadCues();
       await acquireWakeLock(() => {});
+      // The capability probe is two API calls; it must not hold up the start,
+      // and a session with no music simply never ducks.
+      ducking.begin().catch(() => {});
       draw();
       cueFor(steps[index]);
     };
@@ -208,6 +218,7 @@ export function renderRun(root, dayNo) {
     quit.title = 'Leave the runner (session stays open)';
     quit.onclick = () => {
       audio.stop();
+      ducking.end().catch(() => {});
       releaseWakeLock();
       location.hash = '#/day/' + dayNo;
     };
@@ -429,11 +440,11 @@ export function renderRun(root, dayNo) {
       // keyed to this rest, so coming back to the app late does not replay it
       if (left <= 10 && left > 0 && warnedAt !== restStartedAt && step.seconds > 12) {
         warnedAt = restStartedAt;
-        audio.play(audio.CUE_TEN_SECONDS);
+        say(audio.CUE_TEN_SECONDS);
       }
       if (left === 0) {
         skip.textContent = 'Go ›';
-        audio.play(audio.CUE_GO);
+        say(audio.CUE_GO);
         if (navigator.vibrate) navigator.vibrate(200);
         clearInterval(ticker);
         ticker = null;
@@ -474,6 +485,7 @@ export function renderRun(root, dayNo) {
         const flags = computeFlags(db, session.id);
         clearRunnerState(db);
         persist();
+        ducking.end().catch(() => {});
         releaseWakeLock();
         alert(flags.length
           ? flags.length + (flags.length === 1 ? ' suggestion is' : ' suggestions are') + ' waiting on the home screen.'
@@ -483,7 +495,11 @@ export function renderRun(root, dayNo) {
       root.append(fin);
     }
     const back = el('button', 'btn', 'Back to the day');
-    back.onclick = () => { releaseWakeLock(); location.hash = '#/day/' + dayNo; };
+    back.onclick = () => {
+      ducking.end().catch(() => {});
+      releaseWakeLock();
+      location.hash = '#/day/' + dayNo;
+    };
     root.append(back);
   }
 

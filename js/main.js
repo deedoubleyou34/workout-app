@@ -1,5 +1,6 @@
 import { initDb } from './db.js';
 import { handleRedirect, watchForeground } from './spotify.js';
+import { recoverIfStranded } from './ducking.js';
 import { renderHome } from './ui/home.js';
 import { renderDay } from './ui/day.js';
 import { renderRun } from './ui/run.js';
@@ -38,6 +39,11 @@ function notice(text, bad) {
       notice(err.message || 'Spotify login failed.', true);
     }
     watchForeground();
+    // If the app was killed mid-cue, Spotify is still turned down and only
+    // this record knows it. Put the volume back before anything else.
+    recoverIfStranded().then((fixed) => {
+      if (fixed) notice('Music volume restored after the app closed mid-cue.');
+    }).catch(() => {});
     await initDb();
     window.addEventListener('hashchange', route);
     route();

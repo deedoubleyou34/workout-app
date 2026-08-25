@@ -14,6 +14,7 @@ import { buildSteps, remainingSeconds, resumeIndex, progressOf, stepTarget, isTi
 import { setText, restText, cueId, spokenSeconds, hasSecondsClip } from '../js/cues.js';
 import { needsRefresh, callbackParams, retryAfterMs, describeError,
          nowPlayingText } from '../js/spotify.js';
+import { pickStrategy, planCycle, canRelease, MIN_CYCLE_MS } from '../js/ducking.js';
 
 const EX = {
   slRdl:      { id: 1, name: 'Single-leg RDL (DB)', category: 'strength',   load_type: 'dumbbell',   is_timed: 0, increment_value: 5,  increment_unit: 'lb' },
@@ -521,6 +522,48 @@ export async function run(ctx) {
       'Sabotage — Beastie Boys');
     check('nothing playing is null, not a crash', nowPlayingText(null) === null);
     check('a state with no item is null', nowPlayingText({ is_playing: false }) === null);
+  }
+
+  // 34. ducking: the probe picks a strategy from what the device refused
+  //     (spec Phase 6 step 1). The whole phase turns on telling
+  //     VOLUME_CONTROL_DISALLOW apart from every other 403.
+  {
+    eq('a device that accepts a volume write gets strategy A (duck)',
+      pickStrategy({ ok: true }), 'duck');
+    eq('VOLUME_CONTROL_DISALLOW gets strategy B (pause), not silence',
+      pickStrategy({ ok: false, kind: 'volume_disallowed', reason: 'VOLUME_CONTROL_DISALLOW' }), 'pause');
+    eq('the reason string alone is enough to reach strategy B',
+      pickStrategy({ ok: false, kind: 'forbidden', reason: 'Player command failed: VOLUME_CONTROL_DISALLOW' }),
+      'pause');
+    eq('any other 403 falls to strategy C (cue over the music)',
+      pickStrategy({ ok: false, kind: 'forbidden', reason: 'Restriction violated' }), 'none');
+    eq('no Premium means no control at all', pickStrategy({ ok: false, kind: 'premium' }), 'none');
+    eq('a missing probe result is never treated as permission', pickStrategy(null), 'none');
+  }
+
+  // 35. two cues inside one debounce window are ONE duck and ONE restore.
+  //     This is the real case: CUE_GO fires off the rest ticker, then commit
+  //     -> go() -> the next step's cue lands ~50 ms behind it.
+  {
+    const t = 1_000_000;
+    const first = planCycle({ ducked: false }, t, 800);
+    const second = planCycle(first, t + 50, 600);
+    eq('the first cue ducks', first.action, 'duck');
+    eq('the second extends the duck instead of cycling the music',
+      second.action, 'extend');
+    eq('one duck, so one restore', [first.duckedAt, second.duckedAt], [t, t]);
+    check('the music does not come back mid-cue', !canRelease(second, t + 1000));
+    check('it does come back once the window is served', canRelease(second, t + 1600));
+    eq('a short cue still holds the floor for the full debounce',
+      planCycle({ ducked: false }, t, 100).releaseAt, t + MIN_CYCLE_MS);
+  }
+
+  // 36. a longer cue than the debounce keeps the music down until it ends
+  {
+    const t = 2_000_000;
+    const long = planCycle({ ducked: false }, t, 4000);
+    check('a four-second cue is not cut off at 1.5 s', long.releaseAt >= t + 4000);
+    check('nothing releases a cycle that was never ducked', !canRelease({ ducked: false }, t + 99999));
   }
 
   // 25. rest countdown is wall-clock, so a throttled/backgrounded app catches up

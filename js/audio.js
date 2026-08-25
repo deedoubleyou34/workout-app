@@ -97,8 +97,12 @@ export function stop() {
 // Play a queue of clip ids in order. Durations come from the decoded buffers,
 // not the manifest — decoded length is exact, and the manifest's millisecond
 // figures are only advisory.
+//
+// Returns the length of the cue in MILLISECONDS, or 0 if nothing was played.
+// Ducking needs to know how long to hold the music down, and "0" is how it
+// knows a silent session must not duck at all.
 export async function play(ids, { interrupt = true } = {}) {
-  if (!isUnlocked()) return false;
+  if (!isUnlocked()) return 0;
   if (interrupt) stop();
   const list = (Array.isArray(ids) ? ids : [ids]).filter(Boolean);
   const decoded = [];
@@ -106,9 +110,10 @@ export async function play(ids, { interrupt = true } = {}) {
     const buf = await bufferFor(id);
     if (buf) decoded.push(buf);
   }
-  if (!decoded.length) return false;
+  if (!decoded.length) return 0;
 
-  let at = ctx.currentTime + 0.04;
+  const start = ctx.currentTime + 0.04;
+  let at = start;
   for (const buf of decoded) {
     const src = ctx.createBufferSource();
     src.buffer = buf;
@@ -117,7 +122,7 @@ export async function play(ids, { interrupt = true } = {}) {
     scheduled.push(src);
     at += buf.duration + GAP;
   }
-  return true;
+  return Math.round((at - ctx.currentTime) * 1000);
 }
 
 // Last resort for a string with no clip (spec Phase 4).

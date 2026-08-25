@@ -48,6 +48,11 @@ export class SpotifyError extends Error {
 export function describeError(status, reason = '') {
   if (status === 401) return ['expired', 'Spotify login expired. Connect again.'];
   if (status === 403 && /premium/i.test(reason)) return ['premium', 'Playback control needs Spotify Premium.'];
+  // The one 403 that decides the whole ducking strategy (spec Phase 6 step 1):
+  // this device will not let anyone set its volume remotely.
+  if (status === 403 && /VOLUME_CONTROL_DISALLOW/i.test(reason)) {
+    return ['volume_disallowed', 'This device will not let Spotify set its volume remotely.'];
+  }
   if (status === 403) return ['forbidden', 'Spotify refused that: ' + (reason || 'not allowed on this device') + '.'];
   if (status === 404 || /NO_ACTIVE_DEVICE/i.test(reason)) {
     return ['no_device', 'No active device. Start something playing in Spotify, then come back.'];
@@ -294,7 +299,9 @@ async function request(path, { method = 'GET', body = null, query = null, retry 
     const data = await res.json().catch(() => ({}));
     const reason = (data.error && (data.error.reason || data.error.message)) || '';
     const [kind, message] = describeError(res.status, reason);
-    throw new SpotifyError(kind, message, { status: res.status });
+    // `reason` is Spotify's own machine-readable string. The ducking probe
+    // branches on it, so it must survive the throw.
+    throw new SpotifyError(kind, message, { status: res.status, reason });
   }
   if (res.status === 200) return res.json().catch(() => null);
   return null;
@@ -308,6 +315,11 @@ export const player = {
   next: () => request('/me/player/next', { method: 'POST' }),
   previous: () => request('/me/player/previous', { method: 'POST' }),
   transfer: (deviceId) => request('/me/player', { method: 'PUT', body: { device_ids: [deviceId], play: true } }),
+  // 204 on success — "did not throw" is the only signal there is.
+  volume: (percent, deviceId) => request('/me/player/volume', {
+    method: 'PUT',
+    query: { volume_percent: String(Math.round(percent)), ...(deviceId ? { device_id: deviceId } : {}) },
+  }),
 };
 
 // "Track — Artist", or null when nothing is playing.

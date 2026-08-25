@@ -1,5 +1,5 @@
 // Cache-first app shell. Bump CACHE on every deploy that changes shell files.
-const CACHE = 'shell-v16';
+const CACHE = 'shell-v17';
 
 const SHELL = [
   './',
@@ -8,6 +8,7 @@ const SHELL = [
   './js/main.js',
   './js/audio.js',
   './js/spotify.js',
+  './js/ducking.js',
   './js/ui/music.js',
   './js/cues.js',
   './audio/manifest.json',

@@ -6,6 +6,7 @@
 // a console message: expired token, no active device, 429, 403, and no network.
 
 import * as spotify from '../spotify.js';
+import * as ducking from '../ducking.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -127,6 +128,47 @@ export function renderMusic(container, { compact = false } = {}) {
           }
         } catch (err) { showError(err); }
       };
+
+      // ---- ducking: what cues will do to the music, spec Phase 6 step 5 ----
+      const duckBox = el('div', 'duckbox');
+      const duckLine = el('p', 'musicnote', 'Cues over music: not checked yet.');
+      const duckBtn = el('button', 'btn btn-small', 'Check cues over music');
+      duckBtn.onclick = async () => {
+        duckBtn.disabled = true;
+        duckLine.textContent = 'Checking this device…';
+        try {
+          showDuckPlan(await ducking.begin({ force: true }));
+        } catch (err) {
+          duckLine.textContent = err.message || 'Could not check.';
+        } finally {
+          duckBtn.disabled = false;
+        }
+      };
+      duckBox.append(duckLine, duckBtn);
+      root.append(duckBox);
+
+      function showDuckPlan(plan) {
+        duckBox.querySelector('.escape')?.remove();
+        if (!plan) return;
+        const where = plan.deviceName ? ' (' + plan.deviceName + ')' : '';
+        if (plan.strategy === 'duck') {
+          duckLine.textContent = 'Cues dip the music to ' + ducking.DUCK_LEVEL
+            + '% and put it straight back' + where + '.';
+          return;
+        }
+        duckLine.textContent = plan.note || (plan.strategy === 'pause'
+          ? 'This device will not allow a remote volume change, so cues pause the music instead'
+            + where + '.'
+          : 'Cues will play over the music at full volume' + where + '.');
+        // Only worth saying when the device actually refused something.
+        if (plan.probed) {
+          duckBox.append(el('p', 'musicnote escape',
+            'Escape hatch: run Spotify on a Bluetooth speaker or the PC instead of the iPhone. '
+            + 'That sidesteps the iOS audio-session conflict entirely, and volume control usually '
+            + 'works on those devices. It is a better answer than any amount of code here.'));
+        }
+      }
+      showDuckPlan(ducking.currentPlan());
 
       const out = el('button', 'btn btn-small', 'Disconnect');
       out.onclick = async () => {
