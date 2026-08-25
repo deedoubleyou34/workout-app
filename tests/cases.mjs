@@ -771,7 +771,10 @@ export async function run(ctx) {
       + "VALUES (?,?,?,'left',1,8,1,'2026-08-01T10:00:00Z')", [sid, blockRow[0], blockRow[1]]);
     db.run("INSERT INTO nightly_log (date, drill, side, value, unit) VALUES ('2026-08-01','Couch stretch','left',90,'sec')");
 
-    // the same statements resetTrainingData issues, minus the IndexedDB work
+    // These statements MUST mirror resetTrainingData() in js/db.js. They are
+    // repeated rather than called because the real function also clears
+    // IndexedDB keys, which do not exist in Node — so a change there needs a
+    // change here, and this comment is the only thing that says so.
     for (const t of ['set_log', 'progression_flag', 'current_load', 'nightly_log', 'session']) {
       db.run('DELETE FROM ' + t);
     }

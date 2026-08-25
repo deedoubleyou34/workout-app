@@ -1,6 +1,6 @@
 # Phase 8 and the last mile — every phase is now built
 
-**Written:** 2026-08-25 · **Live build:** 020 · **Phases 0–8 built and deployed. The spec is complete.**
+**Written:** 2026-08-25 · **Live build:** 021 · **Phases 0–8 built and deployed. The spec is complete.**
 
 `WHERE-I-LEFT-OFF.md` and `PHASE-6-7-NOTES.md` are both untouched — you're marking those up. This is the third and last one.
 

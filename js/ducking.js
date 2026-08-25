@@ -59,6 +59,7 @@ let releaseTimer = null;
 let failures = 0;
 let ducks = 0;
 let restores = 0;
+let beginPromise = null;
 
 export function currentPlan() {
   return sessionPlan;
@@ -127,7 +128,12 @@ async function probeDevice(deviceId, volume) {
 
 // Work out what this session can do. Called once, behind the runner's Start
 // tap — the same gesture that unlocks audio.
-export async function begin({ force = false } = {}) {
+export async function begin(opts = {}) {
+  beginPromise = doBegin(opts).finally(() => { beginPromise = null; });
+  return beginPromise;
+}
+
+async function doBegin({ force = false } = {}) {
   reset();
   await spotify.loadAuth();
   if (!spotify.isConnected()) {
@@ -246,6 +252,11 @@ function scheduleRelease() {
 export async function speakOver(playFn) {
   const ms = await playFn();
   if (!ms) return ms;
+  // The runner fires begin() without waiting so the session starts instantly.
+  // Without this, the very first cue of every session — the first thing Dom
+  // hears — would play over full-volume music because the probe had not
+  // finished answering yet.
+  if (beginPromise) await beginPromise.catch(() => {});
   const plan = sessionPlan;
   if (!plan || plan.strategy === 'none') return ms;
 
@@ -264,6 +275,11 @@ export async function speakOver(playFn) {
         sessionPlan = { ...plan, strategy: 'none', note: 'Ducking kept failing, so it is off for this session.' };
         cycle = { ducked: false, duckedAt: 0, releaseAt: 0 };
         await idbPut(STRANDED_KEY, null);
+        // Nothing will schedule a release now, so anything waiting on the
+        // music to come back has to be let go here or it waits forever — and
+        // this is exactly the flaky-device case where a queued playlist
+        // switch matters most.
+        drainPending();
         return ms;
       }
     }
