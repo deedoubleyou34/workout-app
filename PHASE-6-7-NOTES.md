@@ -94,6 +94,8 @@ Come back to the first and third after three weeks of real sessions and tell me 
 | 7 — asymmetry dashboard | **Built in 018; gate blocked on ~3 weeks of data** |
 | 8 — playlist switching | Not started |
 
+I also added a pre-deploy check that the tests could never do: the test suite proves every import in the code it runs, but the screen-drawing modules aren't run by any test, so a renamed function there would have been a blank screen on your phone with nothing catching it first. `tools/verify_imports.mjs` now checks all 141 of them before every deploy.
+
 **Test suite is now 130 cases** (it was 89 when you last saw a number). If you run the tests on the phone, expect **ALL 130 TESTS PASSED**.
 
 ## What Phase 8 would be

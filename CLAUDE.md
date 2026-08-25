@@ -92,6 +92,20 @@ Do not scaffold future phases "while you're in there." The gates exist because i
 
 Running record of audit findings and decisions made as phases progress. Newest first. Add an entry whenever a phase surfaces something that changes the plan, the spec, or how we work.
 
+### 2026-08-25 — A pre-deploy check the test suite could never do
+
+`tools/verify_imports.mjs`. Node proves every named import for anything the test
+suite executes, but the UI modules — `home`, `day`, `run`, `dashboard`, `music`,
+`main` — are never imported by a test. A renamed export in one of those is a
+blank screen on Dom's phone and nothing before the deploy catches it. The check
+walks every `import { … } from './…'` in the repo and confirms the target really
+exports each name. 141 imports, all resolving. It belongs in the deploy loop
+next to the other three:
+
+```
+node tools/run_tests.mjs && node tools/verify_seed.mjs   && node tools/verify_migration.mjs && node tools/verify_imports.mjs
+```
+
 ### 2026-08-25 — Phases 6 and 7 built (builds 017, 018)
 
 Dom asked for the next phase while he edits `WHERE-I-LEFT-OFF.md` himself. **That file was not touched, and neither was the parent copy** — the phase 6/7 handoff lives in `PHASE-6-7-NOTES.md` for him to review and merge.
