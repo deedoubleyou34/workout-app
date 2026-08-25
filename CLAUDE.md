@@ -92,6 +92,32 @@ Do not scaffold future phases "while you're in there." The gates exist because i
 
 Running record of audit findings and decisions made as phases progress. Newest first. Add an entry whenever a phase surfaces something that changes the plan, the spec, or how we work.
 
+### 2026-08-25 — Phases 6 and 7 built (builds 017, 018)
+
+Dom asked for the next phase while he edits `WHERE-I-LEFT-OFF.md` himself. **That file was not touched, and neither was the parent copy** — the phase 6/7 handoff lives in `PHASE-6-7-NOTES.md` for him to review and merge.
+
+**Phase 6 — ducking (`js/ducking.js`, build 017).** Probe first, feature second, as the spec insists. Writing the device's current volume back at it is a no-op when allowed and the only way to learn whether it is: success → dip to 25%, `403 VOLUME_CONTROL_DISALLOW` → pause around the cue, anything else → cue over the music. Cached per device id.
+
+- For that branch to exist at all, `spotify.js` had to stop throwing away the API's machine-readable `reason`. `describeError` was flattening every 403 to `forbidden`, which made strategy B and strategy C indistinguishable.
+- **The duck is persisted before the volume PUT.** iOS killing the app mid-cue would otherwise leave the music at 25% with nothing in memory that knows it — the same shape as the hold-clock bug from build 016. `main.js` restores on launch and says so.
+- The debounce is **one duck per burst**, not per cue. The real case is the end of a rest: `CUE_GO` fires off the 250 ms ticker and the next step's cue lands ~50 ms behind it.
+- `audio.play()` now returns the cue length in ms; `0` means nothing played, which is how a silent session avoids ducking entirely.
+- Playback state is re-asserted from `GET /me/player` after every cue, but only back to what it *was*. A manual pause stays paused.
+- Two failures and ducking disables itself for the session — a cue that loses beats music stranded at 25%.
+- The escape hatch (Bluetooth speaker or PC) is on the Music card and appears exactly when the device has refused something.
+
+**Phase 7 — asymmetry dashboard (`js/asymmetry.js`, `js/charts.js`, `js/ui/dashboard.js`, build 018).**
+
+- **§4.4's capacity formula cannot be taken literally.** `MAX(weight_lb * reps_done)` is NULL for Copenhagen planks, single-leg glute bridges, clamshells, fire hydrants — the bodyweight unilateral work, which is most of the asymmetry work in the program and the reason the app exists. Timed → seconds, loaded → weight × reps, bodyweight → reps. Kinds are never mixed into one number.
+- Aggregated per **exercise across all days**, not per block: Day 4's single-leg glute bridge is right-side-only by design and its left data comes from the nightly block, so per-block would report an undefined gap forever.
+- A negative gap means the biased side overtook — said in words ("Right is now ahead by 20%"), never printed as a minus sign.
+- "N weeks ago" is calendar weeks between the ends, not the count of weeks carrying data.
+- Charts are hand-rolled SVG in a viewBox at `width: 100%`, so portrait scales them instead of scrolling sideways.
+
+**On the spec's "do not start Phase 7 without 3 weeks of real data":** built because Dom asked, but **no demo rows were written to the database** — fake `set_log` rows also feed `computeFlags` and would corrupt real progressions. The screen states its own emptiness. The gate item that *can* be satisfied now — verdicts correct against a hand-computed check — is satisfied in the test suite on two exercises, one loaded (20% → 9%) and one timed bodyweight (33% → 11%), the second being exactly the path the literal formula would have dropped.
+
+Suite is at **130 cases**.
+
 ### 2026-08-24 — Phase 5 built: Spotify auth and playback control (build 015)
 
 `js/spotify.js` (auth + player), `js/ui/music.js` (the panel, full on home and compact on the runner's rest screens). Authorization Code with **PKCE**, no client secret — a static site cannot hold one.
