@@ -375,7 +375,7 @@ export function renderRun(root, dayNo) {
     let edited = false;
     if (timed) {
       const dial = el('div', 'dial dial-hold');
-      holdRing = progressRing({ size: 160, stroke: 9, color: '#ffd75e' });
+      holdRing = progressRing({ size: 160, stroke: 9, tinted: true });
       clock = el('div', 'holdclock', '');
       dial.append(holdRing, clock);
       card.append(dial);

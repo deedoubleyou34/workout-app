@@ -130,11 +130,16 @@ export function barChart({ labels, series, width = 340, height = 170, format = (
 // A countdown ring, per the spec's session walkthrough. Returns the <svg> with
 // an `update(fraction)` on it: the ticker repaints four times a second, so it
 // moves one attribute rather than rebuilding the node.
-export function progressRing({ size = 200, stroke = 10, color = '#57c7ff' } = {}) {
+// tinted: colour the arc from --tier in CSS instead of a fixed hex, so it
+// follows the current transformation. It has to go through a class, because a
+// `stroke` presentation ATTRIBUTE cannot take var(). Opt-in, not default: the
+// rest rings use gold-vs-blue to distinguish a main rest from a normal one,
+// and at Super Saiyan Blue the tier colour would collide with ki blue.
+export function progressRing({ size = 200, stroke = 10, color = '#57c7ff', tinted = false } = {}) {
   const r = (size - stroke) / 2;
   const circumference = 2 * Math.PI * r;
   const svg = frame(size, size);
-  svg.setAttribute('class', 'chart ring');
+  svg.setAttribute('class', 'chart ring' + (tinted ? ' ring-tier' : ''));
   const common = { cx: size / 2, cy: size / 2, r, fill: 'none', 'stroke-width': stroke };
   svg.append(node('circle', { ...common, class: 'ring-track' }));
   const arc = node('circle', {

@@ -1,4 +1,4 @@
-import { initDb } from './db.js';
+import { initDb, query } from './db.js';
 import { handleRedirect, watchForeground } from './spotify.js';
 import { recoverIfStranded } from './ducking.js';
 import { renderHome } from './ui/home.js';
@@ -6,6 +6,8 @@ import { renderDay } from './ui/day.js';
 import { renderRun } from './ui/run.js';
 import { renderDashboard } from './ui/dashboard.js';
 import { renderSettings } from './ui/settings.js';
+import { powerFrom, tierFor, applyTierTheme } from './power.js';
+import { weekStart } from './sessions.js';
 
 const app = document.getElementById('app');
 
@@ -30,6 +32,23 @@ function notice(text, bad) {
   setTimeout(() => p.remove(), 8000);
 }
 
+// The same weekly arithmetic renderHome does, run once at boot. Deliberately
+// NOT re-run per route: the runner repaints every 250 ms and this is a pair of
+// COUNT queries. Crossing a form mid-session lands when Dom gets back to the
+// home screen, which is the better moment for it anyway.
+function applyBootTheme() {
+  try {
+    const from = weekStart();
+    const v = query(
+      'SELECT COUNT(*) sets, COALESCE(SUM(l.reps_done),0) reps, '
+      + 'COALESCE(SUM(l.hold_seconds_done),0) holds, '
+      + 'COALESCE(SUM(l.weight_lb*l.reps_done),0) tonnage '
+      + 'FROM set_log l JOIN session s ON s.id = l.session_id WHERE s.date >= ?', [from])[0];
+    const nights = query('SELECT COUNT(DISTINCT date) c FROM nightly_log WHERE date >= ?', [from])[0].c;
+    applyTierTheme(tierFor(powerFrom({ ...v, nights })).tier);
+  } catch { /* a theme is not worth failing a launch over */ }
+}
+
 (async () => {
   try {
     // before routing: the OAuth callback lands on ?code=... and the query has
@@ -49,6 +68,11 @@ function notice(text, bad) {
       if (fixed) notice('Music volume restored after the app closed mid-cue.');
     }).catch(() => {});
     await initDb();
+    // Paint the app in this week's transformation BEFORE the first route.
+    // renderHome does this too, but it is not the only way in: reopening
+    // straight onto #/run/1 — which is what happens after a force-quit, since
+    // the hash survives — used to render with no theme at all.
+    applyBootTheme();
     window.addEventListener('hashchange', route);
     route();
   } catch (err) {

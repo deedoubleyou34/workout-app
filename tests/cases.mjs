@@ -19,7 +19,8 @@ import { pickStrategy, planCycle, canRelease, worthDucking, MIN_CYCLE_MS, MIN_CU
 import { capacityOf, bestCapacity, gapPct, weeklySeries,
          verdictFor } from '../js/asymmetry.js';
 import { niceBounds } from '../js/charts.js';
-import { powerParts, powerFrom, tierFor, tierGoalText, TIERS, WEIGHTS } from '../js/power.js';
+import { powerParts, powerFrom, tierFor, tierGoalText, applyTierTheme,
+         TIERS, WEIGHTS } from '../js/power.js';
 import { bodyPartFor, groupByBodyPart, defaultBodyPart, BODY_PARTS } from '../js/bodyparts.js';
 import { EXERCISES } from '../js/seed.js';
 import { parseContext, contextUrl, phaseForCategory, emptyConfig, loadConfig, saveConfig,
@@ -951,6 +952,19 @@ export async function run(ctx) {
       gaps.every((g, i) => i === 0 || g >= gaps[i - 1]), gaps.join(', '));
     check('every form carries a colour for the screen to take',
       TIERS.every((t) => /^#[0-9a-f]{6}$/i.test(t.accent)));
+    // Two forms sharing a colour means reaching one of them looks like nothing
+    // happened, which defeats the point of a goal tracker.
+    eq('no two forms share a colour',
+      new Set(TIERS.map((t) => t.accent.toLowerCase())).size, TIERS.length);
+    check('every form carries its own glow to match',
+      TIERS.every((t) => /^rgba\(/.test(t.glow)));
+    // The premise Dom chose: gold means Super Saiyan. Base must not already
+    // BE gold, or the transformation is invisible.
+    check('Base is not the same colour as Super Saiyan',
+      TIERS[0].accent.toLowerCase() !== TIERS.find((t) => t.key === 'ssj').accent.toLowerCase(),
+      TIERS[0].accent + ' vs ' + TIERS.find((t) => t.key === 'ssj').accent);
+    eq('Super Saiyan is the gold the app has always used',
+      TIERS.find((t) => t.key === 'ssj').accent.toLowerCase(), '#ffd75e');
 
     // Anchored to what Dom's program actually scores (js/seed.js): one training
     // day is ~19,000 and all four are ~74,000. If the seed's volume ever
@@ -968,6 +982,27 @@ export async function run(ctx) {
       Math.round(tierFor(11500).progressPct) === 50, String(tierFor(11500).progressPct));
     eq('a negative or missing score never falls off the bottom',
       [tierFor(-5).tier.key, tierFor(undefined).tier.key], ['base', 'base']);
+  }
+
+  // 24b2. applyTierTheme writes exactly the properties the stylesheet reads.
+  //       The first version of this wrote --accent, which no rule read, so the
+  //       whole-app theming shipped looking like it worked.
+  {
+    const written = {};
+    const fake = {
+      style: { setProperty(name, value) { written[name] = value; } },
+      dataset: {},
+    };
+    applyTierTheme(TIERS.find((t) => t.key === 'ssg'), fake);
+    eq('the form colour is published as --tier', written['--tier'], '#ff5f8a');
+    check('and its halo as --tier-glow', !!written['--tier-glow']);
+    check('nothing writes a property no rule reads', !('--accent' in written));
+    eq('the form is stamped on the element for CSS to hook', fake.dataset.tier, 'ssg');
+    // Must not throw on a node that cannot be styled — the boot path runs
+    // before anything has rendered.
+    applyTierTheme(TIERS[0], null);
+    applyTierTheme(null, fake);
+    check('a missing tier or node is survivable, not a crash', true);
   }
 
   // 24c. resume only a session with work actually in it (Dom, 2026-08-25:

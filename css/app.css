@@ -13,7 +13,16 @@
   --hit: #ffd75e;
   --miss: #ff6b4a;
   --danger: #ff5d6d;
-  --accent: var(--orange);
+
+  /* The live transformation colour. js/power.js overwrites both of these on
+     the document element every launch; the values here are the fallback for
+     the frame before that runs, and for anything that renders without it.
+
+     --accent used to live here and was read by ZERO rules, which is how the
+     whole-app theming shipped looking like it worked. If you add a token,
+     add the rule that uses it in the same change. */
+  --tier: #ffd75e;
+  --tier-glow: rgba(255, 215, 94, 0.4);
 }
 
 html, body {
@@ -41,8 +50,8 @@ html, body {
   font-style: italic;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--gold);
-  text-shadow: 0 0 18px rgba(255, 215, 94, 0.45);
+  color: var(--tier, var(--gold));
+  text-shadow: 0 0 18px var(--tier-glow, rgba(255, 215, 94, 0.45));
 }
 #status, #build, .muted { color: var(--muted); font-size: 0.9rem; }
 
@@ -61,8 +70,8 @@ html, body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 4px 0;
-  color: var(--gold);
-  text-shadow: 0 0 14px rgba(255, 215, 94, 0.35);
+  color: var(--tier, var(--gold));
+  text-shadow: 0 0 14px var(--tier-glow, rgba(255, 215, 94, 0.35));
 }
 .back { color: var(--ki); text-decoration: none; font-size: 1rem; }
 
@@ -93,10 +102,10 @@ html, body {
 }
 .nextcard {
   background: linear-gradient(160deg, #1c2540, var(--card));
-  border: 1px solid var(--gold);
+  border: 1px solid var(--tier, var(--gold));
   border-radius: 14px;
   padding: 16px;
-  box-shadow: 0 0 22px rgba(255, 215, 94, 0.18);
+  box-shadow: 0 0 22px var(--tier-glow, rgba(255, 215, 94, 0.18));
 }
 .nextday {
   font-size: 1.6rem;
@@ -104,7 +113,7 @@ html, body {
   font-style: italic;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--gold);
+  color: var(--tier, var(--gold));
 }
 .nextname { font-size: 0.95rem; margin-top: 2px; }
 .nextcard .muted { margin-top: 4px; }
@@ -129,7 +138,7 @@ html, body {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--gold);
+  color: var(--tier, var(--gold));
 }
 .flagcard {
   background: var(--card);
@@ -173,7 +182,6 @@ html, body {
 .daycard-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .daycard-meta { color: var(--muted); font-size: 0.75rem; margin-top: 4px; }
 
-.daylist { display: flex; flex-direction: column; gap: 10px; }
 .daycard {
   display: block;
   background: var(--card);
@@ -216,9 +224,9 @@ html, body {
 }
 .tab.active {
   color: #1a1200;
-  border-color: var(--gold);
-  background: linear-gradient(180deg, #ffe9a3, var(--gold));
-  box-shadow: 0 0 14px rgba(255, 215, 94, 0.5);
+  border-color: var(--tier, var(--gold));
+  background: linear-gradient(180deg, #ffe9a3, var(--tier, var(--gold)));
+  box-shadow: 0 0 14px var(--tier-glow, rgba(255, 215, 94, 0.5));
 }
 .tab.done { color: var(--gold); }
 .tab.done.active { color: #1a1200; }
@@ -333,23 +341,18 @@ html, body {
 .btn-small { min-height: 34px; padding: 4px 12px; font-size: 0.85rem; }
 .btnrow { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
 
+/* Data is a drawer now; its <h2> became the drawer tab label. */
 .datasec { margin-top: 26px; }
-.datasec h2 {
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-}
 .foot { margin-top: 26px; }
 .foot p { margin-top: 4px; }
 .powerline {
-  color: var(--gold);
+  color: var(--tier, var(--gold));
   font-weight: 800;
   font-style: italic;
   font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  text-shadow: 0 0 10px rgba(255, 215, 94, 0.4);
+  text-shadow: 0 0 10px var(--tier-glow, rgba(255, 215, 94, 0.4));
 }
 
 .sheet {
@@ -415,7 +418,7 @@ html, body {
 }
 .runfill {
   height: 100%;
-  background: linear-gradient(90deg, var(--orange), var(--gold));
+  background: linear-gradient(90deg, var(--orange), var(--tier, var(--gold)));
   box-shadow: 0 0 10px rgba(255, 215, 94, 0.6);
   transition: width 0.25s;
 }
@@ -441,8 +444,8 @@ html, body {
   letter-spacing: 0.02em;
   line-height: 1.15;
   margin: 6px 0;
-  color: var(--gold);
-  text-shadow: 0 0 16px rgba(255, 215, 94, 0.3);
+  color: var(--tier, var(--gold));
+  text-shadow: 0 0 16px var(--tier-glow, rgba(255, 215, 94, 0.3));
 }
 .runset { color: var(--muted); font-size: 0.9rem; }
 .runtarget { font-size: 1.5rem; font-weight: 800; margin: 8px 0 12px; }
@@ -496,8 +499,8 @@ html, body {
   transition: color 0.2s ease;
 }
 .holdclock.running {
-  color: var(--gold);
-  text-shadow: 0 0 24px rgba(255, 215, 94, 0.45);
+  color: var(--tier, var(--gold));
+  text-shadow: 0 0 24px var(--tier-glow, rgba(255, 215, 94, 0.45));
 }
 .holdbtn {
   min-height: 44px;
@@ -568,8 +571,8 @@ html, body {
 .duckbox .escape {
   margin-top: 6px;
   padding: 8px 10px;
-  border-left: 3px solid var(--gold);
-  background: rgba(255, 215, 94, 0.08);
+  border-left: 3px solid var(--tier, var(--gold));
+  background: rgba(255, 255, 255, 0.04);
   color: var(--fg);
   line-height: 1.4;
 }
@@ -630,6 +633,11 @@ html, body {
 .dial-hold { width: min(46vw, 180px); }
 .dial .ring { position: absolute; inset: 0; }
 .ring-track { stroke: rgba(255, 255, 255, 0.08); }
+/* progressRing({ tinted: true }) -- the arc follows the current form. A stroke
+   ATTRIBUTE cannot take var(), so the colour has to arrive through CSS.
+   Only the hold ring opts in: the rest rings use gold-vs-blue to tell a main
+   rest from a normal one, and at Super Saiyan Blue the tier would collide. */
+.ring-tier .ring-arc { stroke: var(--tier, var(--gold)); }
 .ring-arc { transition: stroke-dashoffset 0.25s linear; }
 .dial .restclock, .dial .holdclock {
   position: absolute;
@@ -647,7 +655,7 @@ html, body {
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--gold);
+  color: var(--tier, var(--gold));
   font-weight: 800;
   margin-bottom: 4px;
 }
@@ -728,7 +736,7 @@ html, body {
   font: inherit;
 }
 .pickeritem:active { background: #182242; }
-.pickertype { font-size: 1.1rem; color: var(--gold); width: 18px; text-align: center; }
+.pickertype { font-size: 1.1rem; color: var(--tier, var(--gold)); width: 18px; text-align: center; }
 .pickerbody { display: flex; flex-direction: column; min-width: 0; }
 .pickername {
   font-weight: 700;
@@ -760,7 +768,7 @@ html, body {
 /* ================= build 025: the home screen Dom asked for ================= */
 
 /* ---- power level as a goal tracker ----
-   The accent/tier custom properties are set from js/power.js on every home
+   The --tier custom properties are set from js/power.js on every home
    render, so everything below re-colours itself when a form is reached. */
 .tierbox {
   margin: 10px 0 6px;
@@ -848,8 +856,28 @@ html, body {
 .resumeday { font-size: 1rem; font-weight: 700; margin: 4px 0 2px; }
 .resumebtn { margin-top: 8px; }
 
-/* ---- the permanent slim music bar ---- */
-.slimsec { margin-bottom: 14px; }
+/* ---- the permanent slim music bar ----
+   Sticky at the very top (Dom, 2026-08-25: "add music bar to the top of the
+   screen"). `top` has to clear the notch: the app runs black-translucent, so
+   top:0 would slide it under the status bar.
+
+   Full-bleed with a blur rather than a flat colour, because body carries a
+   fixed radial gradient — a solid var(--bg) strip would read as a dark band
+   across the lightest part of it. The pill's rounded corners also mean content
+   would show through the gaps without a backing layer.
+
+   z-index 15 leaves the one-shot OAuth .notice (z-index 20) on top for its
+   few seconds rather than fighting it. */
+.slimsec {
+  position: sticky;
+  top: env(safe-area-inset-top);
+  z-index: 15;
+  margin: 0 -14px 14px;
+  padding: 6px 14px 8px;
+  background: rgba(16, 22, 42, 0.82);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
 .slimbar {
   display: flex;
   align-items: center;
@@ -871,20 +899,26 @@ html, body {
   white-space: nowrap;
 }
 .slimoff .slimtext { color: var(--muted); font-weight: 400; }
-/* only a title too long for the line revolves; --roll is set per track so a
-   long name does not crawl and a short one does not bolt */
+/* Only a title too long for the line revolves; --roll is set per track so a
+   long name does not crawl and a short one does not bolt.
+
+   Deliberately NOT wrapped in prefers-reduced-motion. Dom asked for this
+   behaviour by name, twice, and an earlier build honoured the OS setting —
+   which meant that with Reduce Motion on in iOS the feature he asked for
+   silently did not exist. It is one slow line of text at ~40px/s, not parallax.
+   This is a recorded decision, not an oversight. */
 .rolling .slimtrack { animation: slimroll var(--roll, 14s) linear infinite; }
 @keyframes slimroll {
   from { transform: translateX(0); }
   to   { transform: translateX(calc(-50% - 1.5em)); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .rolling .slimtrack { animation: none; }
-  .rolling .slimtext { overflow: hidden; text-overflow: ellipsis; }
-}
 
-/* ---- All days, crammed into a drop-down tab bar ---- */
-.daytab {
+/* ---- collapsible drawers ----
+   Two of these: All days, and Data (Dom, 2026-08-25: "Collapse data section
+   into a tab as well to save on screen space"). One set of rules, built by
+   collapsible() in js/ui/home.js. */
+.drawer { margin-bottom: 20px; }
+.drawertab {
   width: 100%;
   display: flex;
   align-items: center;
@@ -900,8 +934,8 @@ html, body {
   letter-spacing: 0.1em;
   font-weight: 700;
 }
-.daytablabel { flex: none; }
-.daytabhint {
+.drawerlabel { flex: none; }
+.drawerhint {
   flex: 1;
   text-align: right;
   text-transform: none;
@@ -910,10 +944,9 @@ html, body {
   font-size: 0.76rem;
   color: var(--muted);
 }
-.daycaret { flex: none; color: var(--tier, var(--gold)); }
-.open .daytabhint { flex: 1; }
-.daydrawer { display: none; flex-direction: column; gap: 10px; margin-top: 10px; }
-.open .daydrawer { display: flex; }
+.drawercaret { flex: none; color: var(--tier, var(--gold)); }
+.drawerbody { display: none; flex-direction: column; gap: 10px; margin-top: 10px; }
+.open .drawerbody { display: flex; }
 
 /* ---- build 026: the dashboard, one body part at a time ----
    Dom, 2026-08-25: "categorize each measured excercise by body category...

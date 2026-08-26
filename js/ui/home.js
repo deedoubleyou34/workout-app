@@ -23,24 +23,54 @@ function download(blob, filename) {
 
 const UNIT_LABEL = { lb: 'lb', sec: 's', rep: ' reps', band_step: '', vest: '' };
 
-// The day list is crammed into a drop-down (Dom, 2026-08-25). Whether it is
-// open is a preference, not data, so it lives in localStorage rather than in
-// the .sqlite export — and a failed read must never take the home screen with
-// it (Safari private mode throws on localStorage).
-const DAYS_OPEN_KEY = 'htc-days-open';
-
-function daysOpen() {
+// Whether a drawer is open is a preference, not data, so it lives in
+// localStorage rather than in the .sqlite export — and a failed read must never
+// take the home screen with it (Safari private mode throws on localStorage).
+export function drawerOpen(key) {
   try {
-    return localStorage.getItem(DAYS_OPEN_KEY) === '1';
+    return localStorage.getItem(key) === '1';
   } catch {
     return false;
   }
 }
 
-function setDaysOpen(open) {
+export function setDrawerOpen(key, open) {
   try {
-    localStorage.setItem(DAYS_OPEN_KEY, open ? '1' : '0');
+    localStorage.setItem(key, open ? '1' : '0');
   } catch { /* preference lost, screen still works */ }
+}
+
+// One collapsible section. There are two of these now — the day list and Data
+// (Dom, 2026-08-25: "Collapse data section into a tab as well to save on
+// screen space") — so the button, the caret, the open class and the stored
+// preference live in one place rather than being copied.
+//
+// Returns { node, body }: append the section's contents to `body`.
+export function collapsible({ label, hint = '', storageKey, cls = '' }) {
+  const node = el('nav', 'drawer' + (cls ? ' ' + cls : ''));
+  const tab = el('button', 'drawertab');
+  const tabLabel = el('span', 'drawerlabel', label);
+  const tabHint = el('span', 'drawerhint', '');
+  const caret = el('span', 'drawercaret', '▾');
+  tab.append(tabLabel, tabHint, caret);
+  const body = el('div', 'drawerbody');
+  node.append(tab, body);
+
+  let open = drawerOpen(storageKey);
+  const paint = () => {
+    node.classList.toggle('open', open);
+    caret.textContent = open ? '▴' : '▾';
+    // the hint is what the closed state is for: a reason not to open it
+    tabHint.textContent = open ? '' : hint;
+    tab.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+  tab.onclick = () => {
+    open = !open;
+    setDrawerOpen(storageKey, open);
+    paint();
+  };
+  paint();
+  return { node, body };
 }
 
 // "L  45 → 50 lb" — the whole suggestion at a glance.
@@ -57,6 +87,15 @@ export function renderHome(root) {
   const db = getDb();
   root.innerHTML = '';
   root.className = 'page';
+
+  // ---------- the permanent slim music bar ----------
+  // First thing on the page and sticky, so it stays visible while the rest
+  // scrolls (Dom, 2026-08-25: "add music bar to the top of the screen"). The
+  // full Music card — controls, devices, Connect — has NOT moved; it is still
+  // at the bottom, which is where he asked for it to stay.
+  const slim = el('section', 'slimsec');
+  root.append(slim);
+  renderNowPlayingBar(slim);
 
   // ---------- title + power level ----------
   const header = el('header', 'top');
@@ -182,23 +221,15 @@ export function renderHome(root) {
     root.append(card);
   }
 
-  // ---------- the permanent slim music bar ----------
-  // Where "Next up" used to sit. The full Music card, with the controls and the
-  // Connect button, has NOT moved — it is still at the bottom.
-  const slim = el('section', 'slimsec');
-  root.append(slim);
-  renderNowPlayingBar(slim);
-
   // ---------- day list, as a drop-down tab bar ----------
   const next = nextDayUp(db);
-  const list = el('nav', 'daylist');
-  const tab = el('button', 'daytab');
-  const tabLabel = el('span', 'daytablabel', 'All days');
-  const tabHint = el('span', 'daytabhint', '');
-  const caret = el('span', 'daycaret', '▾');
-  tab.append(tabLabel, tabHint, caret);
-  const drawer = el('div', 'daydrawer');
-  list.append(tab, drawer);
+  const days = collapsible({
+    label: 'All days',
+    hint: 'Day ' + next.day_no + ' next',
+    storageKey: 'htc-days-open',
+    cls: 'daylist',
+  });
+  const drawer = days.body;
 
   for (const d of daySummaries(db)) {
     const a = el('a', 'daycard');
@@ -217,20 +248,7 @@ export function renderHome(root) {
     drawer.append(a);
   }
 
-  let open = daysOpen();
-  const paintTab = () => {
-    list.classList.toggle('open', open);
-    caret.textContent = open ? '▴' : '▾';
-    tabHint.textContent = open ? '' : 'Day ' + next.day_no + ' next';
-    tab.setAttribute('aria-expanded', open ? 'true' : 'false');
-  };
-  tab.onclick = () => {
-    open = !open;
-    setDaysOpen(open);
-    paintTab();
-  };
-  paintTab();
-  root.append(list);
+  root.append(days.node);
 
   // ---------- suggestions, grouped per exercise ----------
   const flags = pendingFlags(db);
@@ -346,8 +364,17 @@ export function renderHome(root) {
   renderMusic(music);
 
   // ---------- data ----------
-  const data = el('section', 'datasec');
-  data.append(el('h2', null, 'Data'));
+  // Collapsed like the day list (Dom, 2026-08-25: "Collapse data section into
+  // a tab as well to save on screen space"). Everything goes inside, including
+  // the Settings and test links — but NOT the footer below it, which carries
+  // the build number and is the first thing to check when a deploy lands.
+  const dataDrawer = collapsible({
+    label: 'Data',
+    hint: 'export · import · settings',
+    storageKey: 'htc-data-open',
+    cls: 'datasec',
+  });
+  const data = dataDrawer.body;
   const row = el('div', 'btnrow');
 
   const expSql = el('button', 'btn', 'Export .sqlite');
@@ -392,7 +419,7 @@ export function renderHome(root) {
   const testLink = el('a', 'testlink', 'Run progression tests →');
   testLink.href = 'tests/test.html';
   data.append(testLink);
-  root.append(data);
+  root.append(dataDrawer.node);
 
   // ---------- footer ----------
   const streak = nightlyStreak(db);

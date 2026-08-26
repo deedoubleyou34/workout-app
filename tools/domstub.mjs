@@ -72,6 +72,17 @@ class El {
       getPropertyValue(name) { return this[name] == null ? '' : String(this[name]); },
     };
     this.dataset = {};
+    // Layout. Node has none, so these are 0 until a check sets them — which is
+    // exactly what a browser reports before first paint, and the case the slim
+    // bar's marquee has to handle rather than read as "the text fits".
+    // Without these the stub THREW here, and because the only paths the tests
+    // reached passed marquee:false, the throw never happened and the marquee
+    // shipped having never executed anywhere (Dom: "the audio bar doesnt move
+    // in a rotating").
+    this.clientWidth = 0;
+    this.clientHeight = 0;
+    this.scrollWidth = 0;
+    this.scrollHeight = 0;
     this.attributes = {};
     this.listeners = {};
     this._text = '';
@@ -342,13 +353,23 @@ export function installDom({ root = process.cwd() } = {}) {
     };
   });
 
+  // Real listeners, not no-ops. The slim bar re-measures its marquee on
+  // resize/orientationchange, and a stub that swallows the registration would
+  // report that path as covered while never running it.
+  const windowListeners = {};
   globalThis.window = {
     BUILD: 'test',
     document: DOCUMENT,
     location: globalThis.location,
-    addEventListener() { /* the harness drives events directly */ },
-    removeEventListener() {},
+    addEventListener(type, fn) { (windowListeners[type] ||= []).push(fn); },
+    removeEventListener(type, fn) {
+      windowListeners[type] = (windowListeners[type] || []).filter((f) => f !== fn);
+    },
     scrollTo() {},
+  };
+  // How a check fires one: globalThis.dispatchWindow('resize').
+  globalThis.dispatchWindow = (type, event = {}) => {
+    for (const fn of [...(windowListeners[type] || [])]) fn(event);
   };
   globalThis.scrollTo = () => {};
   return { document: DOCUMENT, idb: IDB };

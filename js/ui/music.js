@@ -52,21 +52,85 @@ export function renderNowPlayingBar(container) {
     disposed = true;
     if (timer) clearInterval(timer);
     timer = null;
+    if (typeof window !== 'undefined' && window.removeEventListener) {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    }
+    if (pending && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(pending);
+    pending = null;
     if (stopBar === stop) stopBar = null;
   };
   stopBar = stop;
   const alive = () => !disposed && bar.isConnected;
 
-  // Scroll only when the text does not fit. A short title that crawls sideways
-  // for no reason is worse than one that sits still.
+  // ---- the revolving track name ----
+  //
+  // Dom, 2026-08-25: "the audio bar doesnt move in a rotating". This code had
+  // never executed anywhere when he said that: the only paths the tests reach
+  // pass marquee:false and short-circuit before the measurement, so the branch
+  // below was shipped unproven. It now has its own screen checks.
+  //
+  // Scroll only when the text does not actually fit — a short title crawling
+  // sideways for no reason is worse than one that sits still.
+  const LONG_ENOUGH = 28;   // characters, the fallback when measuring fails
+  const PX_PER_SECOND = 40;
+
+  let pending = null;       // rAF handle for a deferred re-measure
+  let lastText = '';
+  let lastMarquee = false;
+
+  // Measuring needs layout. Called straight after textContent it can land in
+  // the same frame the node was created in, where clientWidth is still 0 — and
+  // 0 read as "it fits" is silence, which is the bug being fixed. So: a zero
+  // width is "cannot tell yet", never "no".
+  function measure() {
+    const windowWidth = Number(win.clientWidth) || 0;
+    const textWidth = Number(a.scrollWidth) || 0;
+    if (!windowWidth || !textWidth) return null;      // no answer, not a "no"
+    return { overflows: textWidth > windowWidth, textWidth };
+  }
+
+  function paintRoll(on, textWidth) {
+    b.textContent = on ? lastText : '';
+    bar.classList.toggle('rolling', on);
+    if (!on) return;
+    // The loop travels one copy plus one gap, so the duration has to scale with
+    // the text or a long title crawls and a short one bolts.
+    const width = textWidth || lastText.length * 8;
+    track.style.setProperty('--roll', Math.max(width / PX_PER_SECOND, 8) + 's');
+  }
+
+  function applyRoll({ retry = true } = {}) {
+    if (!lastMarquee) return paintRoll(false);
+    const m = measure();
+    if (m) return paintRoll(m.overflows, m.textWidth);
+    // Could not measure. Try once more on the next frame, and if that also
+    // fails fall back to the character count: a failed measurement must
+    // degrade to scrolling, not to silence.
+    if (retry && typeof requestAnimationFrame === 'function') {
+      if (pending) cancelAnimationFrame(pending);
+      pending = requestAnimationFrame(() => {
+        pending = null;
+        applyRoll({ retry: false });
+      });
+      return;
+    }
+    paintRoll(lastText.length > LONG_ENOUGH, 0);
+  }
+
   function setText(text, { marquee = true } = {}) {
+    lastText = text;
+    lastMarquee = marquee;
     a.textContent = text;
-    const overflows = marquee && win.clientWidth > 0 && a.scrollWidth > win.clientWidth;
-    b.textContent = overflows ? text : '';
-    bar.classList.toggle('rolling', overflows);
-    // The loop travels exactly one copy's width, so the speed has to scale
-    // with the text or a long title crawls and a short one bolts.
-    if (overflows) track.style.setProperty('--roll', Math.max(a.scrollWidth / 40, 8) + 's');
+    applyRoll();
+  }
+
+  // A rotation changes the width the text has to fit in, and the poll is only
+  // every 15 s — without this the bar keeps yesterday's answer until then.
+  const onResize = () => { if (alive()) applyRoll(); };
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
   }
 
   async function refresh() {

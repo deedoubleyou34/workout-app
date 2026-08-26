@@ -1,12 +1,30 @@
 # Where I left off — Hyperbolic Time Chamber
 
-**Last updated:** 2026-08-25 · **Live build:** 027 · **Status:** every phase in the spec (0–8) is built. Every note you wrote in the three review files has been worked through, and those files are now folded into this one.
+**Last updated:** 2026-08-25 · **Live build:** 028 · **Status:** every phase in the spec (0–8) is built. Every note you wrote in the three review files has been worked through, and those files are now folded into this one.
 
 This is the only handover doc now, apart from **`MUSIC-NOTES.md`**, which covers the in-app music picker and still has its own open gate — see the bottom of this file.
 
 ---
 
-## What changed since you marked up the notes (builds 025 and 026)
+## ⚠️ Read this first: nothing had been deployed
+
+You were right that the day drop-down and the sliding dashboard were missing —
+they were never on your phone. **GitHub Pages was serving build 024** while five
+finished builds sat on the PC, unpushed. That is on me, and it is why an audit
+of "did the updates get added" kept coming back yes while your phone kept
+saying no.
+
+I went back through all three of your marked-up docs line by line against the
+actual code. **34 of 35 items were already built.** The one that was not is the
+colour half of the power-level request, which is fixed in this build. Everything
+is now pushed, and the first thing to check is that **the build number reads
+b028** — in the footer, or the runner's top bar. If it still says 024, that is a
+cache problem, not a code problem: remove the app from your home screen and add
+it again from Safari.
+
+---
+
+## What changed since you marked up the notes (builds 025 to 028)
 
 | Your note | What I did |
 |---|---|
@@ -22,6 +40,9 @@ This is the only handover doc now, apart from **`MUSIC-NOTES.md`**, which covers
 | "forced quit… when I reopened the app it doesn't allow me to start Spotify where it left off unless I start playing music on a device that has Spotify" | The app now remembers the last device it saw playing and wakes it. That is Spotify's behaviour rather than a bug here, but it is worth working around. |
 | "There is no dip but I feel it isn't necessary since the pause and start happens." | Agreed, nothing changed. Your device runs the pause strategy and it works. |
 | "Home screen says HTC which is correct" | Closed. |
+| "Collapse data section into a tab as well to save on screen space" | **Data ▾** collapses like All days, exports and both links inside. The footer stays out — it carries the build number. |
+| "add music bar to the top of the screen" | It is now the **first thing on the page and sticky**, so it stays put while everything else scrolls. |
+| "the audio bar doesnt move in a rotating" | **Fixed, and it was a real bug** — see below. |
 | Spec audit — set number in cues ("keep as is"), weight in cues ("not necessary"), spoken summary ("don't add"), Done tap on clamshells ("keep for accountability") | All four left exactly as they were. Those questions are closed. |
 
 ---
@@ -39,6 +60,35 @@ When there is nothing to resume, that space belongs to the slim music bar, which
 **And a second trap underneath the first, which I want to own rather than bury.** I shipped that card working and the *tap* broken, for one commit. The card is deliberately not limited to today; the runner was still asking for today's session only. So the card would offer last night's force-quit session, you would tap Resume, the runner would find nothing for today, start a brand-new empty session — and your night's work would be stranded with the old session sitting open forever. Fixed: the runner and the card now share one definition of which session is live, and there is a test that goes from one to the other, because the test that only checked the card passed the whole time.
 
 A stale *empty* session — a day you opened weeks ago and never worked — is closed out rather than left open behind the new one.
+
+---
+
+## The revolving track name — you found something real
+
+This is worth telling you straight, because the honest answer is not "it was
+just undeployed."
+
+That code had **never executed anywhere.** The tests only ever reached the two
+paths that skip the scrolling (not connected, and offline), and both of those
+short-circuit before the width measurement. So the branch that decides whether
+to scroll had never run in a test — and if it had, it would have crashed,
+because the test harness has no concept of how wide anything is. It was shipped
+unproven and I described it as working.
+
+Three things came out of fixing it:
+
+1. **A `prefers-reduced-motion` rule was switching the animation off entirely.**
+   If you have Reduce Motion on in iOS accessibility settings, the feature you
+   asked for twice would silently not exist. That rule is gone — you asked for
+   this behaviour by name, and it is one slow line of text, not parallax. Noted
+   here so it is a decision rather than something I quietly overrode.
+2. **A failed measurement used to mean silence.** If the bar was measured before
+   the phone had laid it out, the width came back `0`, and `0` read as "the text
+   fits" — so it sat still. Now a zero width means "cannot tell yet": it retries
+   on the next frame, and if that also fails it scrolls anything longer than
+   about 28 characters. Failing towards scrolling is the right way round.
+3. **It now has four tests** covering a long title, a short one, and both
+   measurement-failure cases.
 
 ---
 
@@ -69,7 +119,23 @@ And the ladder:
 | Super Saiyan Blue | 88,000 | four days plus the weight on the bar and the nights in the book |
 | Ultra Instinct | 115,000 | above the program; no week has to reach it |
 
-The app repaints itself in the current form's colours — the accent, the glow, the progress bar, the day tab, the dashboard's drop-down. It follows you into the runner rather than snapping back to gold.
+**The whole app repaints in the current form's colours** — the title, the Next
+up card, the runner's progress bar and exercise name, the hold ring, the section
+headings, the settings labels. It is applied at launch rather than only on the
+home screen, so opening straight into a session after a force-quit is themed
+too.
+
+**Base is orange, and that is deliberate.** Gold now *means* Super Saiyan. A
+fresh Monday reads orange and the gold you are used to arrives when you have put
+in about a full training day. Expect the app to look different at the start of a
+week — that is the point.
+
+**Some colours deliberately do not change**, because they carry meaning rather
+than identity: on-target / done / increase stay gold at every form, so success
+never changes colour on you. Most importantly, **left vs right on the asymmetry
+charts stay gold-and-blue** — at Super Saiyan Blue the form colour is almost
+exactly the ki blue those charts use, and the one screen this whole app exists
+for would have ended up with two lines you could not tell apart.
 
 **The legend is under "What makes this number"** on the home screen, and it shows the arithmetic line by line. I did not change any of the weights: the score you have been watching still reads the same, this only explains it.
 
@@ -90,7 +156,7 @@ That was always true; the legend is just the first thing to say it out loud. I d
 | Local repo | `Projects/Workout/workout-app/` — standalone git repo, pushes straight to Pages |
 | Spotify Client ID | `cf46be5104434a87948db209215d61f7` (redirect URI = the Pages URL exactly; no secret, PKCE) |
 | Name | **Hyperbolic Time Chamber** (icon label "Chamber") |
-| Test suite | **239 cases** + 100 screen checks + 5 pre-deploy commands. On the phone, expect **ALL 239 TESTS PASSED** |
+| Test suite | **248 cases** + 124 screen checks + 5 pre-deploy commands. On the phone, expect **ALL 248 TESTS PASSED** |
 
 The parent folder holds reference copies of `workout_plan.txt`, `PROJECT_SPEC.md`, `CLAUDE.md`. **The copies inside `workout-app/` are canonical** — the parent copies are synced at phase boundaries.
 
@@ -130,7 +196,7 @@ Grouped by what you have to be holding to do it. Everything already ticked off i
 
 ### At the phone, thirty seconds each
 
-- [ ] **Run the tests in Safari.** Home → *Run progression tests →*. Expect **ALL 239 TESTS PASSED**.
+- [ ] **Run the tests in Safari.** Home → **Data ▾** → *Run progression tests →*. Expect **ALL 248 TESTS PASSED**.
 - [ ] **The home screen.** Resume card, slim music bar, All-days drop-down, Next up below it. Does the order read right?
 - [ ] **The power ladder.** Are the forms in the right places, and do you want to answer the nightly-weight question above?
 - [ ] **The dashboard drop-down.** Open it and swipe. It will still be thin on data — I am asking whether it looks right, not whether it says anything yet.
@@ -249,7 +315,7 @@ Forgetting the `CACHE` bump means phones keep serving the old shell from cache.
 
 | | |
 |---|---|
-| `run_tests.mjs` | the 239 logic cases — progression rules, step ordering, cue text, ducking, the power ladder, body parts |
+| `run_tests.mjs` | the 248 logic cases — progression rules, step ordering, cue text, ducking, the power ladder, body parts |
 | `verify_seed.mjs` | every line the app can say has a clip, including the ones an accepted progression can reach |
 | `verify_migration.mjs` | after a reseed, every logged set still points at its original (day, exercise, occurrence) |
 | `verify_imports.mjs` | every named import resolves — the screen modules are not run by any test, so a renamed export there is a blank screen — **and** every shipped file is in the service worker's precache list |

@@ -9,6 +9,7 @@
 // The DOM stub is strict on purpose (see tools/domstub.mjs): an unimplemented
 // property read is an error, not a silent undefined.
 import { createRequire } from 'module';
+import { readFileSync } from 'fs';
 import { installDom, clearAllTimers } from './domstub.mjs';
 
 const require = createRequire(import.meta.url);
@@ -106,6 +107,13 @@ const db = getDb();
     check('the full Music card is still at the bottom, below the slim bar',
       home.children.indexOf(home.querySelector('.musicsec'))
       > home.children.indexOf(home.querySelector('.slimsec')));
+    // Dom, 2026-08-25: "add music bar to the top of the screen".
+    check('the slim bar is the FIRST thing on the page',
+      home.children.indexOf(home.querySelector('.slimsec')) === 0,
+      'index ' + home.children.indexOf(home.querySelector('.slimsec')));
+    check('and it sits above the app title',
+      home.children.indexOf(home.querySelector('.slimsec'))
+      < home.children.indexOf(home.querySelector('.top')));
 
     // Nothing has been trained, so there is nothing to resume.
     check('no resume card on a database with no live session',
@@ -113,20 +121,43 @@ const db = getDb();
 
     // All days is a drop-down, closed, and Next up now sits BELOW it.
     const drawer = home.querySelector('.daylist');
-    check('the day list is a drop-down tab bar', !!home.querySelector('.daytab'));
+    check('the day list is a drop-down tab bar', !!drawer && !!drawer.querySelector('.drawertab'));
     check('and it starts closed', drawer && !drawer.classList.contains('open'));
     check('the day cards are all in the drawer, not loose on the page',
-      home.querySelectorAll('.daydrawer .daycard').length === 5,
-      home.querySelectorAll('.daydrawer .daycard').length + ' cards');
+      home.querySelectorAll('.daylist .drawerbody .daycard').length === 5,
+      home.querySelectorAll('.daylist .drawerbody .daycard').length + ' cards');
     check('Next up has dropped below the day drawer',
       home.children.indexOf(home.querySelector('.nextsec'))
       > home.children.indexOf(drawer));
     if (drawer) {
-      home.querySelector('.daytab').click();
+      drawer.querySelector('.drawertab').click();
       check('tapping the tab bar opens it', drawer.classList.contains('open'));
-      home.querySelector('.daytab').click();
+      drawer.querySelector('.drawertab').click();
       check('and tapping again closes it', !drawer.classList.contains('open'));
     }
+
+    // Data collapses the same way (Dom, 2026-08-25: "Collapse data section
+    // into a tab as well to save on screen space").
+    const dataDrawer = home.querySelector('.datasec');
+    check('Data is a drawer too', !!dataDrawer && !!dataDrawer.querySelector('.drawertab'));
+    check('and it starts closed', dataDrawer && !dataDrawer.classList.contains('open'));
+    if (dataDrawer) {
+      check('every export and both links are inside it',
+        dataDrawer.querySelectorAll('.drawerbody .btn').length >= 4
+        && dataDrawer.querySelectorAll('.drawerbody .testlink').length === 2,
+        dataDrawer.querySelectorAll('.drawerbody .btn').length + ' buttons, '
+          + dataDrawer.querySelectorAll('.drawerbody .testlink').length + ' links');
+      dataDrawer.querySelector('.drawertab').click();
+      check('tapping Data opens it', dataDrawer.classList.contains('open'));
+      dataDrawer.querySelector('.drawertab').click();
+      check('and tapping again closes it', !dataDrawer.classList.contains('open'));
+    }
+    // The build number must NOT be inside a drawer — it is the first thing to
+    // check when a deploy lands, and it lives in the footer for that reason.
+    check('the footer stays outside the Data drawer',
+      !!home.querySelector('.foot')
+      && home.children.indexOf(home.querySelector('.foot'))
+        > home.children.indexOf(dataDrawer));
 
     // The power level is a goal tracker now: a form, a bar, and a legend.
     check('home names the current form', contains(home, 'Base'));
@@ -139,6 +170,99 @@ const db = getDb();
     check('the form repaints the app rather than only itself',
       globalThis.document.documentElement.dataset.tier === 'base',
       String(globalThis.document.documentElement.dataset.tier));
+  }
+
+  // ---------------------------------------------- the revolving track name
+  //
+  // Dom, 2026-08-25: "the audio bar doesnt move in a rotating." When he said
+  // that, this code had never executed ANYWHERE: the only paths the harness
+  // reached passed marquee:false and short-circuited before the measurement,
+  // and the DOM stub had no clientWidth to measure with — so the throw that
+  // would have exposed it never happened either. These checks exist so that
+  // cannot recur.
+  {
+    const { renderNowPlayingBar } = await import('../js/ui/music.js');
+    const realFetch = globalThis.fetch;
+
+    // A live player response, so setText runs with marquee: true.
+    const playing = (title, artist) => ({
+      is_playing: true,
+      device: { id: 'dev1', name: 'iPhone', volume_percent: 60 },
+      item: { name: title, artists: [{ name: artist }] },
+    });
+
+    const withTrack = async (title, artist, widths) => {
+      globalThis.fetch = async (input) => {
+        const url = String(typeof input === 'string' ? input : input.url);
+        if (!url.startsWith('http')) return realFetch(input);
+        return { ok: true, status: 200, headers: { get: () => null },
+          json: async () => playing(title, artist) };
+      };
+      const root = screen();
+      const stop = renderNowPlayingBar(root);
+      await tick(6);
+      const bar = root.querySelector('.slimbar');
+      const win = root.querySelector('.slimwin');
+      const text = root.querySelector('.slimtext');
+      // Stand in for layout: the window is 300px, the text is whatever the
+      // caller says. A browser measures this; Node cannot, so the harness does.
+      win.clientWidth = widths.win;
+      text.scrollWidth = widths.text;
+      // re-run the measurement now that there is something to measure
+      globalThis.dispatchWindow('resize');
+      await tick(2);
+      return { root, bar, stop };
+    };
+
+    // Long title in a narrow bar -> it revolves.
+    {
+      const { root, bar, stop } = await withTrack(
+        'A Very Long Song Title That Will Not Fit', 'Some Band With A Long Name',
+        { win: 300, text: 900 });
+      check('a track too long for the bar revolves',
+        bar.classList.contains('rolling'), bar.className);
+      check('and the loop carries a duplicate copy so it wraps seamlessly',
+        root.querySelectorAll('.slimtext')[1].textContent
+          === root.querySelectorAll('.slimtext')[0].textContent,
+        JSON.stringify(root.querySelectorAll('.slimtext').map((n) => n.textContent)));
+      check('the scroll duration scales with the text rather than being fixed',
+        root.querySelector('.slimtrack').style.getPropertyValue('--roll') === '22.5s',
+        root.querySelector('.slimtrack').style.getPropertyValue('--roll'));
+      check('the track name and artist are both on the bar',
+        contains(root, 'A Very Long Song Title') && contains(root, 'Some Band'),
+        root.querySelector('.slimtext').textContent);
+      stop();
+    }
+
+    // Short title that fits -> it sits still. A short name crawling sideways
+    // for no reason is worse than one that does not move.
+    {
+      const { bar, stop } = await withTrack('Go', 'Chemical Brothers',
+        { win: 300, text: 120 });
+      check('a track that fits does NOT revolve',
+        !bar.classList.contains('rolling'), bar.className);
+      stop();
+    }
+
+    // The failure that started this: measurement unavailable. A zero width
+    // must read as "cannot tell yet", never as "it fits" — the fallback is to
+    // scroll on character count, because degrading to silence IS the bug.
+    {
+      const { bar, stop } = await withTrack(
+        'Another Extremely Long Track Name Indeed', 'And A Long Artist Too',
+        { win: 0, text: 0 });
+      check('a failed measurement falls back to scrolling, not to silence',
+        bar.classList.contains('rolling'), bar.className);
+      stop();
+    }
+    {
+      const { bar, stop } = await withTrack('Short', 'Band', { win: 0, text: 0 });
+      check('but a short name still does not scroll when measurement fails',
+        !bar.classList.contains('rolling'), bar.className);
+      stop();
+    }
+
+    globalThis.fetch = realFetch;
   }
 
   const day = await render('day 1', (root) => renderDay(root, 1));
@@ -497,9 +621,14 @@ const db = getDb();
       (home.querySelector('.resumebtn') || {}).href
         && home.querySelector('.resumebtn').href.startsWith('#/run/'),
       String((home.querySelector('.resumebtn') || {}).href));
-    check('the resume card sits above the slim bar, near the top',
+    // Order at the top, since 028: sticky music bar, then the title/power
+    // header, then the resume card. The bar is pinned above everything (Dom,
+    // 2026-08-25); the resume card still comes before the day list.
+    check('the resume card sits below the sticky bar but above the day list',
       home.children.indexOf(home.querySelector('.resumecard'))
-      < home.children.indexOf(home.querySelector('.slimsec')));
+        > home.children.indexOf(home.querySelector('.slimsec'))
+      && home.children.indexOf(home.querySelector('.resumecard'))
+        < home.children.indexOf(home.querySelector('.daylist')));
     check('the slim bar is still there alongside it',
       !!home.querySelector('.slimbar'));
     check('logged work moves the legend off zero',
@@ -582,6 +711,58 @@ const db = getDb();
 
   const day = await render('day 1 (with a session in progress)', (root) => renderDay(root, 1));
   if (day) check('a day with logged sets renders', day.querySelectorAll('.setbtn').length > 0);
+}
+
+// ------------------------------------------------------- the theme reaches everything
+//
+// "the home screen adn layout should match based on the colors of each power
+// level form automatically" (Dom, 2026-08-25). The first attempt at this set a
+// --accent custom property that NO css rule read, and only ran on the home
+// route — so a cold open on #/run/1 after a force-quit had no theme at all.
+{
+  const css = readFileSync('css/app.css', 'utf8');
+
+  const dead = (css.match(/var\(--accent\)/g) || []).length;
+  check('no rule reads a custom property nothing sets',
+    dead === 0, dead + ' var(--accent) uses');
+
+  // Identity surfaces follow the form...
+  const tiered = (css.match(/var\(--tier[,)]/g) || []).length;
+  check('the form colour actually drives rules rather than only existing',
+    tiered > 20, tiered + ' rules use var(--tier…)');
+
+  // ...but the ones that carry MEANING do not. gold = on target / done /
+  // increase, and the dashboard's left-vs-right must stay legible at every
+  // form: at Super Saiyan Blue the tier is #3fd8ff against ki blue #57c7ff.
+  // Read the whole declaration block, not just the selector line — most of
+  // these are multi-line rules and matching one line would assert on nothing.
+  const ruleBody = (selector) => {
+    const at = css.indexOf('\n' + selector);
+    if (at < 0) return null;
+    const open = css.indexOf('{', at);
+    const close = css.indexOf('}', open);
+    return open < 0 || close < 0 ? null : css.slice(at, close + 1);
+  };
+  for (const rule of ['.setbtn.hit', '.chip-complete', '.tab.done', '.restclock.done']) {
+    const body = ruleBody(rule);
+    check(rule + ' keeps its fixed colour — success must not change weekly',
+      !!body && body.includes('var(--gold)') && !body.includes('var(--tier'),
+      body ? body.replace(/\s+/g, ' ').slice(0, 70) : 'rule not found');
+  }
+  const dash = readFileSync('js/ui/dashboard.js', 'utf8');
+  check('left vs right on the dashboard stay gold-and-blue at every form',
+    /const WEAK = '#ffd75e'/.test(dash) && /const STRONG = '#57c7ff'/.test(dash));
+
+  // The theme is applied at boot, so a route that is not home is themed too.
+  delete globalThis.document.documentElement.dataset.tier;
+  globalThis.location.hash = '#/progress';
+  const dash2 = screen();
+  renderDashboard(dash2);
+  check('a non-home route still renders (the boot theme path)', dash2.textContent.length > 20);
+  const main = readFileSync('js/main.js', 'utf8');
+  check('main.js applies the theme before the first route, not only on home',
+    /applyBootTheme\(\);\s*\n\s*window\.addEventListener\('hashchange'/.test(main));
+  globalThis.location.hash = '';
 }
 
 // ---------------------------------------------------------------- export / import

@@ -1,5 +1,5 @@
 // Cache-first app shell. Bump CACHE on every deploy that changes shell files.
-const CACHE = 'shell-v27';
+const CACHE = 'shell-v28';
 
 const SHELL = [
   './',

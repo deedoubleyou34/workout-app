@@ -92,6 +92,79 @@ Do not scaffold future phases "while you're in there." The gates exist because i
 
 Running record of audit findings and decisions made as phases progress. Newest first. Add an entry whenever a phase surfaces something that changes the plan, the spec, or how we work.
 
+### 2026-08-25 — Build 028. The one that had never been deployed.
+
+**Read this before believing any audit of this project.** Dom reported the new
+build was "missing all day drop down list" and the dashboard "still shows
+vertical portrait instead of sliding." Both were true, and neither was a code
+bug: `origin/main` was serving **build 024** while five finished builds sat
+local. A line-by-line audit against local HEAD kept answering "yes, it is
+built," which was correct and completely useless to him.
+
+**A green suite is not a deploy.** `git log origin/main..HEAD` belongs in the
+pre-deploy list next to the five checks, and "did it land" is a question the
+build number answers, not the test count.
+
+**Current state:** schema **v6**, TTS **+24%**, warm-up rests 15 s and silent,
+suite at **248 cases** plus **124 screen checks**, five pre-deploy commands.
+Docs: `WHERE-I-LEFT-OFF.md` and `MUSIC-NOTES.md`.
+
+**The marquee had never executed anywhere, and the harness said it was fine.**
+This is the most useful thing in this build. `renderNowPlayingBar` decides
+whether to scroll by measuring text against its container. Every path the screen
+harness reached passed `marquee: false` — not connected, and offline — and those
+short-circuit **before** the measurement. So the branch never ran; and had it
+run, the DOM stub would have thrown, because it had no `clientWidth`. Untested
+code, an all-green harness, and a confident "done" in the handover.
+
+The shape to remember: **a check that never reaches a branch is indistinguishable
+from a check that passes it.** The two `marquee: false` call sites were doing all
+the covering. When a function's behaviour is gated by an argument, the tests have
+to drive both values of that argument or the interesting half is decoration.
+
+Three real defects fell out of making it run:
+- `prefers-reduced-motion` set `animation: none` on it. With Reduce Motion on in
+  iOS — common — the feature Dom asked for twice silently did not exist. The
+  override is now deliberate and recorded: he asked by name, and it is one slow
+  line of text, not parallax.
+- A `0` width read as "the text fits", so an unlaid-out bar sat still forever.
+  Zero now means "cannot tell yet": retry next frame, then fall back to a
+  character count. **Degrade towards the feature, not towards silence.**
+- The stub's `window.addEventListener` was a no-op, so a resize listener could
+  be registered and never fire. It is real now, with `globalThis.dispatchWindow`
+  for checks to drive it.
+
+**The whole-app theming was shipped as a variable nothing read.**
+`applyTierTheme()` wrote `--accent`; **zero** CSS rules referenced it. 24 chrome
+rules were hardcoded `var(--gold)`, the rings and chart series carried literal
+hex from JS, and the theme only applied on the home route — so a cold open on
+`#/run/1` after a force-quit had no theme at all. If you add a token, add the
+rule that reads it in the same change; `verify_screens.mjs` now fails on a
+`var(--accent)` that nothing sets.
+
+**Identity is themed; meaning is not.** Titles, the Next up card, the runner's
+progress bar and exercise name, the hold ring and section headings follow the
+form. Hit/done/increase keep gold so success does not change colour weekly, and
+the dashboard's `WEAK`/`STRONG` stay gold-and-blue — at Super Saiyan Blue the
+tier is `#3fd8ff` against ki `#57c7ff`, and left-vs-right on the one screen this
+app exists for would have become two indistinguishable lines. That exclusion
+list is asserted, not just commented.
+
+**Base is `#ff8c2e`, so gold now means Super Saiyan.** A form that shares a
+colour with the one below it is a transformation you cannot see; there is a test
+that no two forms match and that Base is not already gold.
+
+**Two collapsibles means one `collapsible()`.** Data joined All days behind a
+tab (Dom: "to save on screen space"), so the button, caret, open class and
+`localStorage` preference moved into one helper rather than a second copy. The
+footer deliberately stays outside it — it carries the build number, which is the
+first thing to check when a deploy lands, and burying that behind a tap while
+also having a deploy problem would have been an unfortunate pairing.
+
+The slim music bar is now `position: sticky` at the top of the home screen, with
+`top: env(safe-area-inset-top)` — the app runs `black-translucent`, so `top: 0`
+slides it under the notch.
+
 ### 2026-08-25 — Dom's marked-up notes worked through (builds 025, 026)
 
 **Current state, so the next session does not have to reconstruct it:** schema

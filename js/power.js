@@ -63,8 +63,16 @@ export function powerFrom(counts) {
 }
 
 // Every tier carries its own palette, because Dom asked for the screen to
-// change with the form. `accent` drives buttons and links, `glow` the header's
-// halo. They are applied as CSS custom properties — see applyTierTheme().
+// change with the form. `accent` drives the app's identity surfaces — titles,
+// the Next up card, the runner's progress bar and exercise name, the hold ring
+// — and `glow` their halos. Applied as CSS custom properties; see
+// applyTierTheme().
+//
+// What it deliberately does NOT drive: anything where a colour carries meaning.
+// Hit/miss/done stay fixed so success does not change colour every week, and
+// the dashboard's left-vs-right series stay gold-and-blue — at Super Saiyan
+// Blue the tier is #3fd8ff against ki blue #57c7ff, and the one screen this
+// app exists for would have had two indistinguishable lines on it.
 export const TIERS = [
   {
     key: 'base', name: 'Base', at: 0,
@@ -144,7 +152,6 @@ export function tierGoalText(power) {
 export function applyTierTheme(tier, root) {
   const node = root || (typeof document !== 'undefined' ? document.documentElement : null);
   if (!node || !node.style || !tier) return;
-  node.style.setProperty('--accent', tier.accent);
   node.style.setProperty('--tier', tier.accent);
   node.style.setProperty('--tier-glow', tier.glow);
   node.dataset.tier = tier.key;
