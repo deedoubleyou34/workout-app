@@ -11,14 +11,32 @@ import { weekStart } from './sessions.js';
 
 const app = document.getElementById('app');
 
+// What the screen currently on display needs undone before another replaces
+// it. A renderer returns a function to be handed back here, or nothing.
+//
+// The runner is why this exists: it owns a 250 ms interval, a visibilitychange
+// listener, the wake lock, live audio and an active duck. Before this, only its
+// X button cleaned any of that up, so leaving any other way left it running —
+// speaking cues on the dashboard, and, from a hold, logging sets Dom never did
+// and repainting itself over whatever he was looking at.
+let teardown = null;
+
 function route() {
-  if (location.hash.startsWith('#/progress')) return renderDashboard(app);
-  if (location.hash.startsWith('#/settings')) return renderSettings(app);
+  if (teardown) {
+    // A screen that throws on the way out must never trap him on it.
+    try { teardown(); } catch { /* nothing to do but carry on */ }
+    teardown = null;
+  }
+  if (location.hash.startsWith('#/progress')) return void renderDashboard(app);
+  if (location.hash.startsWith('#/settings')) return void renderSettings(app);
   const run = location.hash.match(/^#\/run\/(\d+)/);
-  if (run) return renderRun(app, Number(run[1]));
+  if (run) {
+    teardown = renderRun(app, Number(run[1]));
+    return;
+  }
   const day = location.hash.match(/^#\/day\/(\d+)/);
-  if (day) return renderDay(app, Number(day[1]));
-  return renderHome(app);
+  if (day) return void renderDay(app, Number(day[1]));
+  return void renderHome(app);
 }
 
 // A banner for whatever the Spotify redirect had to say, cleared on the next
@@ -61,7 +79,9 @@ function applyBootTheme() {
     } catch (err) {
       notice(err.message || 'Spotify login failed.', true);
     }
-    watchForeground();
+    watchForeground((device) => {
+      notice('Spotify is on ' + (device.name || 'your phone') + ' — playing.');
+    });
     // If the app was killed mid-cue, Spotify is still turned down and only
     // this record knows it. Put the volume back before anything else.
     recoverIfStranded().then((fixed) => {

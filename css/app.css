@@ -337,6 +337,17 @@ html, body {
   font-weight: 800;
   box-shadow: 0 0 14px rgba(255, 140, 46, 0.45);
 }
+/* An <a> is display:inline, where vertical padding, border and min-height do
+   NOT affect line height — so a .btn anchor paints its box straight over the
+   content above and below it. That is what overlapped the resume card (Dom,
+   2026-08-25). inline-block rather than block so small buttons keep their own
+   width; the full-width ones declare display:block themselves. */
+a.btn {
+  display: inline-block;
+  text-align: center;
+  text-decoration: none;
+  vertical-align: middle;
+}
 .btn-danger { color: var(--danger); border-color: var(--danger); }
 .btn-small { min-height: 34px; padding: 4px 12px; font-size: 0.85rem; }
 .btnrow { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
@@ -854,7 +865,25 @@ html, body {
 }
 .resumemeta { font-size: 0.72rem; color: var(--muted); }
 .resumeday { font-size: 1rem; font-weight: 700; margin: 4px 0 2px; }
-.resumebtn { margin-top: 8px; }
+/* Small, and under the day line rather than across it (Dom, 2026-08-25).
+   40px rather than btn-small's 34px: it is a button he reaches for one-handed
+   mid-session and 34 is under the touch-target floor. */
+.resumeactions { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.resumebtn {
+  min-height: 40px;
+  padding: 9px 18px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.resumeover {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 0.8rem;
+  text-decoration: underline;
+  min-height: 40px;
+  padding: 0 4px;
+}
 
 /* ---- the permanent slim music bar ----
    Sticky at the very top (Dom, 2026-08-25: "add music bar to the top of the

@@ -2,9 +2,10 @@ import { query, storageStatus, exportSqliteBlob, exportJsonBlob, exportCsvBlob, 
          getDb, persist, backupStatus, markBackedUp } from '../db.js';
 import { pendingFlags, acceptFlag, acceptAll, declineFlag, snoozeFlag, isSessionHit } from '../progression.js';
 import { daySummaries, nextDayUp, lastSessionReport, nightlyStreak, today, weekStart,
-         resumableSession } from '../sessions.js';
+         resumableSession, startOver } from '../sessions.js';
 import { renderMusic, renderNowPlayingBar } from './music.js';
 import { powerParts, powerFrom, tierFor, tierGoalText, applyTierTheme } from '../power.js';
+import { collapsible } from './widgets.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -22,56 +23,6 @@ function download(blob, filename) {
 }
 
 const UNIT_LABEL = { lb: 'lb', sec: 's', rep: ' reps', band_step: '', vest: '' };
-
-// Whether a drawer is open is a preference, not data, so it lives in
-// localStorage rather than in the .sqlite export — and a failed read must never
-// take the home screen with it (Safari private mode throws on localStorage).
-export function drawerOpen(key) {
-  try {
-    return localStorage.getItem(key) === '1';
-  } catch {
-    return false;
-  }
-}
-
-export function setDrawerOpen(key, open) {
-  try {
-    localStorage.setItem(key, open ? '1' : '0');
-  } catch { /* preference lost, screen still works */ }
-}
-
-// One collapsible section. There are two of these now — the day list and Data
-// (Dom, 2026-08-25: "Collapse data section into a tab as well to save on
-// screen space") — so the button, the caret, the open class and the stored
-// preference live in one place rather than being copied.
-//
-// Returns { node, body }: append the section's contents to `body`.
-export function collapsible({ label, hint = '', storageKey, cls = '' }) {
-  const node = el('nav', 'drawer' + (cls ? ' ' + cls : ''));
-  const tab = el('button', 'drawertab');
-  const tabLabel = el('span', 'drawerlabel', label);
-  const tabHint = el('span', 'drawerhint', '');
-  const caret = el('span', 'drawercaret', '▾');
-  tab.append(tabLabel, tabHint, caret);
-  const body = el('div', 'drawerbody');
-  node.append(tab, body);
-
-  let open = drawerOpen(storageKey);
-  const paint = () => {
-    node.classList.toggle('open', open);
-    caret.textContent = open ? '▴' : '▾';
-    // the hint is what the closed state is for: a reason not to open it
-    tabHint.textContent = open ? '' : hint;
-    tab.setAttribute('aria-expanded', open ? 'true' : 'false');
-  };
-  tab.onclick = () => {
-    open = !open;
-    setDrawerOpen(storageKey, open);
-    paint();
-  };
-  paint();
-  return { node, body };
-}
 
 // "L  45 → 50 lb" — the whole suggestion at a glance.
 function moveText(f) {
@@ -215,9 +166,27 @@ export function renderHome(root) {
         : ' · ' + live.daysAgo + ' days ago')));
     card.append(row);
     card.append(el('div', 'resumeday', 'Day ' + live.day_no + ' — ' + live.name));
+
+    // A small button UNDER the day line, plus the way out of the session.
+    // Dom, 2026-08-25: he went looking for "start over" and could not find it —
+    // it exists on the Day screen but is buried in a row of small buttons, and
+    // this card is where he actually sees that a session is open.
+    const actions = el('div', 'resumeactions');
     const back = el('a', 'btn btn-primary resumebtn', '▶  Resume Day ' + live.day_no);
     back.href = '#/run/' + live.day_no;
-    card.append(back);
+    actions.append(back);
+
+    const over = el('button', 'resumeover', 'Start over');
+    over.onclick = async () => {
+      if (!confirm('Start Day ' + live.day_no + ' over? The ' + live.sets
+        + (live.sets === 1 ? ' set' : ' sets')
+        + ' you logged stay in your history but will not count toward progression.')) return;
+      startOver(db, live.day_no);
+      await persist();
+      renderHome(root);
+    };
+    actions.append(over);
+    card.append(actions);
     root.append(card);
   }
 
@@ -413,9 +382,16 @@ export function renderHome(root) {
 
   row.append(expSql, expCsv, expJson, imp, file);
   data.append(row);
-  const settingsLink = el('a', 'testlink', 'Settings — music, backup, start fresh →');
+  const settingsLink = el('a', 'testlink', 'Settings — music, backup, playlists →');
   settingsLink.href = '#/settings';
   data.append(settingsLink);
+  // Named outright rather than hidden behind "Settings" (Dom, 2026-08-25 —
+  // he was hunting for a way to wipe everything). The action itself stays in
+  // Settings behind its two confirmations and its backup offer; this only
+  // shortens the path to it.
+  const freshLink = el('a', 'testlink freshlink', 'Start fresh — delete all training data →');
+  freshLink.href = '#/settings';
+  data.append(freshLink);
   const testLink = el('a', 'testlink', 'Run progression tests →');
   testLink.href = 'tests/test.html';
   data.append(testLink);

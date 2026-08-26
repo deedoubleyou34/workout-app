@@ -97,6 +97,20 @@ export function renderRun(root, dayNo) {
   let ticker = null;
   let warnedAt = null;   // which rest already got its ten-second warning
 
+  // Set by cleanup(). Everything that can touch the database or repaint the
+  // page checks it.
+  //
+  // Dom, 2026-08-25: "I've closed backed out of the day but the session is
+  // still running... while on dashboard." Leaving the runner by anything other
+  // than the X left the 250 ms ticker alive, and `root` is the shared #app
+  // element — so a hold reaching zero called commit(), logged a set he never
+  // did, and then redrew the runner over whatever screen he was looking at.
+  //
+  // Clearing the interval is the fix; this flag is the second, independent one.
+  // A set written by a torn-down runner is corrupt data feeding the progression
+  // engine, and that deserves more than one thing standing in its way.
+  let dead = false;
+
   // A hold runs its own clock: { index, startedAt, accMs, running }. It is
   // pausable (Dom asked for a play/pause so a stretch can be set up first), so
   // one startedAt is not enough — elapsed is accumulated across pauses and
@@ -115,6 +129,7 @@ export function renderRun(root, dayNo) {
   }
 
   function go(next) {
+    if (dead) return;
     index = Math.max(0, Math.min(next, steps.length - 1));
     restStartedAt = steps[index] && steps[index].kind === 'rest' ? Date.now() : null;
     hold = null;
@@ -197,7 +212,11 @@ export function renderRun(root, dayNo) {
 
     const holder = el('div', 'sheetmusic');
     sheet.append(holder);
-    renderMusic(holder, { compact: true, key: 'sheet' });
+    renderMusic(holder, {
+      compact: true,
+      key: 'sheet',
+      contextUri: () => (source || {}).uri || null,
+    });
 
     const change = el('button', 'btn btn-primary', 'Change music');
     change.onclick = () => { sheet.remove(); pickMusicNow(); };
@@ -297,6 +316,7 @@ export function renderRun(root, dayNo) {
 
   // ---------- drawing ----------
   function draw() {
+    if (dead) return;
     if (ticker) { clearInterval(ticker); ticker = null; }
     if (!started) return drawGate();
     root.innerHTML = '';
@@ -308,12 +328,10 @@ export function renderRun(root, dayNo) {
     const bar = el('div', 'runtop');
     const quit = el('button', 'iconbtn', '✕');
     quit.title = 'Leave the runner (session stays open)';
-    quit.onclick = () => {
-      audio.stop();
-      ducking.end().catch(() => {});
-      releaseWakeLock();
-      location.hash = '#/day/' + dayNo;
-    };
+    // Only navigates. route() runs cleanup() on the way out, so the X and the
+    // back gesture are the same code path — them being different is exactly
+    // how the runner came to keep running after Dom backed out of it.
+    quit.onclick = () => { location.hash = '#/day/' + dayNo; };
     bar.append(quit);
     bar.append(el('span', 'runprogress', 'Day ' + dayNo + ' · ' + done + '/' + total
       + ' sets · b' + (window.BUILD || '?')));
@@ -447,6 +465,7 @@ export function renderRun(root, dayNo) {
     root.append(nav);
 
     function commit(elapsed) {
+      if (dead) return;          // never log a set from a runner that is gone
       let val = null;
       if (timed) {
         // the clock is the source of truth — never the prescribed number —
@@ -490,7 +509,7 @@ export function renderRun(root, dayNo) {
     const paintHold = () => {
       // go() clears `hold` on the way to the next step; a tick that lands
       // after that must do nothing
-      if (!hold) return;
+      if (dead || !hold) return;
       const left = Math.max(tgt.value - Math.floor(holdElapsedMs() / 1000), 0);
       clock.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
       clock.classList.toggle('running', hold.running);
@@ -532,7 +551,13 @@ export function renderRun(root, dayNo) {
     // the rest ends, and he was hitting skip-track instead of Go.
     const musicBar = el('div', 'runmusic');
     root.append(musicBar);
-    renderMusic(musicBar, { compact: true, key: 'rest' });
+    // The runner knows what this block is mapped to, so an Open Spotify tap
+    // from here lands on the right playlist rather than wherever Spotify was.
+    renderMusic(musicBar, {
+      compact: true,
+      key: 'rest',
+      contextUri: () => (sourceFor(step.category, music) || {}).uri || null,
+    });
 
     const card = el('section', 'runcard restcard' + (step.main ? ' mainrest' : ''));
     card.append(el('div', 'runside', step.main ? 'MAIN REST' : 'REST'));
@@ -559,6 +584,7 @@ export function renderRun(root, dayNo) {
 
     // wall-clock delta, recomputed every tick — survives iOS throttling
     const paint = () => {
+      if (dead) return;
       const left = remainingSeconds(restStartedAt, step.seconds);
       clock.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
       clock.classList.toggle('done', left === 0);
@@ -614,8 +640,6 @@ export function renderRun(root, dayNo) {
         const flags = computeFlags(db, session.id);
         clearRunnerState(db);
         persist();
-        ducking.end().catch(() => {});
-        releaseWakeLock();
         alert(flags.length
           ? flags.length + (flags.length === 1 ? ' suggestion is' : ' suggestions are') + ' waiting on the home screen.'
           : 'No suggestions yet — a jump needs two clean sessions in a row.');
@@ -624,11 +648,7 @@ export function renderRun(root, dayNo) {
       root.append(fin);
     }
     const back = el('button', 'btn', 'Back to the day');
-    back.onclick = () => {
-      ducking.end().catch(() => {});
-      releaseWakeLock();
-      location.hash = '#/day/' + dayNo;
-    };
+    back.onclick = () => { location.hash = '#/day/' + dayNo; };
     root.append(back);
   }
 
@@ -670,4 +690,19 @@ export function renderRun(root, dayNo) {
   document.addEventListener('visibilitychange', onVisible);
 
   draw();
+
+  // Handed to route(), which runs it before rendering anything else. Idempotent:
+  // it can be called twice without complaining.
+  function cleanup() {
+    if (dead) return;
+    dead = true;
+    if (ticker) { clearInterval(ticker); ticker = null; }
+    // Added on every entry to the runner; without this they accumulate and
+    // every foreground fires one draw() per past visit.
+    document.removeEventListener('visibilitychange', onVisible);
+    releaseWakeLock();
+    audio.stop();
+    ducking.end().catch(() => {});
+  }
+  return cleanup;
 }

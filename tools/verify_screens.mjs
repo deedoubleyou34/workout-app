@@ -10,7 +10,7 @@
 // property read is an error, not a silent undefined.
 import { createRequire } from 'module';
 import { readFileSync } from 'fs';
-import { installDom, clearAllTimers } from './domstub.mjs';
+import { installDom, clearAllTimers, liveTimerCount } from './domstub.mjs';
 
 const require = createRequire(import.meta.url);
 const initSqlJs = require('../vendor/sql-wasm.js');
@@ -88,7 +88,19 @@ const db = getDb();
     check('home offers a run link', !!home.querySelector('.nextstart'));
     check('a fresh database does NOT nag for a backup', !home.querySelector('.backupcard'));
 
-    // ---- build 025: the home screen Dom asked for ----
+      // ---- the CSS guard that would have caught the resume overlap ----
+    // An <a> is display:inline, where vertical padding, border and min-height
+    // do not affect line height — so a .btn anchor paints over its neighbours.
+    {
+      const css = readFileSync('css/app.css', 'utf8');
+      const at = css.indexOf('\na.btn');
+      const body = at < 0 ? null : css.slice(at, css.indexOf('}', at) + 1);
+      check('a.btn declares a display, so an anchor-as-button cannot overlap',
+        !!body && /display:\s*(inline-block|block|flex)/.test(body),
+        body ? body.replace(/\s+/g, ' ').slice(0, 70) : 'no a.btn rule at all');
+    }
+
+  // ---- build 025: the home screen Dom asked for ----
     // The slim music bar is PERMANENT. Nothing about being logged out of
     // Spotify, or having no data, is allowed to remove it.
     check('the slim music bar is there on a brand-new database',
@@ -142,11 +154,18 @@ const db = getDb();
     check('Data is a drawer too', !!dataDrawer && !!dataDrawer.querySelector('.drawertab'));
     check('and it starts closed', dataDrawer && !dataDrawer.classList.contains('open'));
     if (dataDrawer) {
-      check('every export and both links are inside it',
+      check('every export and all three links are inside it',
         dataDrawer.querySelectorAll('.drawerbody .btn').length >= 4
-        && dataDrawer.querySelectorAll('.drawerbody .testlink').length === 2,
+        && dataDrawer.querySelectorAll('.drawerbody .testlink').length === 3,
         dataDrawer.querySelectorAll('.drawerbody .btn').length + ' buttons, '
           + dataDrawer.querySelectorAll('.drawerbody .testlink').length + ' links');
+      // Dom went looking for a way to wipe everything and could not find it
+      // behind a link that only said "Settings".
+      check('and the full wipe is named outright, not hidden behind "Settings"',
+        !!dataDrawer.querySelector('.freshlink')
+        && dataDrawer.querySelector('.freshlink').textContent.includes('delete all training data'),
+        dataDrawer.querySelector('.freshlink')
+          ? dataDrawer.querySelector('.freshlink').textContent : 'missing');
       dataDrawer.querySelector('.drawertab').click();
       check('tapping Data opens it', dataDrawer.classList.contains('open'));
       dataDrawer.querySelector('.drawertab').click();
@@ -170,6 +189,95 @@ const db = getDb();
     check('the form repaints the app rather than only itself',
       globalThis.document.documentElement.dataset.tier === 'base',
       String(globalThis.document.documentElement.dataset.tier));
+  }
+
+  // ------------------------------------------- the Music card's Advanced tab
+  //
+  // Dom, 2026-08-25: "Tab the cue over music section as cue included devices
+  // and disconnect for Spotify and test search." The card keeps the track and
+  // the transport row; everything set up once goes behind one tab.
+  {
+    const { renderMusic } = await import('../js/ui/music.js');
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (input) => {
+      const url = String(typeof input === 'string' ? input : input.url);
+      if (!url.startsWith('http')) return realFetch(input);
+      return { ok: true, status: 200, headers: { get: () => null },
+        json: async () => ({ is_playing: false, device: { id: 'd1', name: 'iPhone' }, item: null }) };
+    };
+    const root = screen();
+    renderMusic(root);
+    await tick(6);
+
+    const drawer = root.querySelector('.musicadvanced');
+    check('the Music card has an Advanced tab', !!drawer && !!drawer.querySelector('.drawertab'));
+    check('and it starts closed', drawer && !drawer.classList.contains('open'));
+    if (drawer) {
+      const inside = drawer.textContent;
+      check('Devices, Disconnect, Test search and the cue check are all inside it',
+        ['Devices', 'Disconnect', 'Test search', 'Check cues over music']
+          .every((t) => inside.includes(t)),
+        inside.slice(0, 110));
+      // The controls he uses mid-set must NOT be behind a tap.
+      check('the transport controls stay outside the tab',
+        !!root.querySelector('.musicrow')
+        && !drawer.querySelector('.musicrow'));
+      drawer.querySelector('.drawertab').click();
+      check('tapping Advanced opens it', drawer.classList.contains('open'));
+      drawer.querySelector('.drawertab').click();
+      check('and tapping again closes it', !drawer.classList.contains('open'));
+    }
+    // It called an empty function and showed no sign it had done anything,
+    // sitting in the transport row where Dom read it as a reset.
+    check('the refresh button is gone from the transport row',
+      !root.textContent.includes('↻'), root.querySelector('.musicrow').textContent);
+    globalThis.fetch = realFetch;
+    clearAllTimers();
+  }
+
+  // -------------------------------------------- Open Spotify when it is dead
+  //
+  // A force-quit Spotify is not in GET /me/player/devices at all, so no API
+  // call can reach it. The only lever is a spotify: URL from a real tap.
+  {
+    const { renderMusic } = await import('../js/ui/music.js');
+    const spotify = await import('../js/spotify.js');
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (input) => {
+      const url = String(typeof input === 'string' ? input : input.url);
+      if (!url.startsWith('http')) return realFetch(input);
+      if (url.includes('/me/player/devices')) {
+        return { ok: true, status: 200, headers: { get: () => null },
+          json: async () => ({ devices: [] }) };          // Spotify is not running
+      }
+      return { ok: false, status: 404, headers: { get: () => null },
+        json: async () => ({ error: { status: 404, reason: 'NO_ACTIVE_DEVICE' } }) };
+    };
+
+    await spotify.clearWake();
+    const root = screen();
+    renderMusic(root, { contextUri: 'spotify:playlist:37i9dQZF1DXcBWIGoYBM5M' });
+    await tick(6);
+    const toggle = root.querySelectorAll('.musicbtn')[1];
+    if (toggle) { toggle.click(); await tick(8); }
+
+    const open = root.querySelector('.openspotify');
+    check('a dead Spotify offers a way to start it, not a dead end', !!open,
+      root.querySelector('.musicnote').textContent);
+    if (open) {
+      check('the link goes to the playlist this block is mapped to',
+        open.href === 'spotify:playlist:37i9dQZF1DXcBWIGoYBM5M', String(open.href));
+      check('and the message says what is actually wrong',
+        root.textContent.includes('Spotify is not running'));
+      open.click();
+      await tick(4);
+      const armed = await spotify.pendingWake();
+      check('tapping it arms the resume so coming back finishes the job',
+        !!armed && spotify.isFreshWake(armed), JSON.stringify(armed));
+      await spotify.clearWake();
+    }
+    globalThis.fetch = realFetch;
+    clearAllTimers();
   }
 
   // ---------------------------------------------- the revolving track name
@@ -527,9 +635,10 @@ const db = getDb();
     await persist();
     const root = screen();
     try {
-      renderRun(root, 1);
+      const cleanup = renderRun(root, 1);
       const silent = root.children.find((c) => c.textContent === 'Start without voice');
       if (silent) { silent.click(); await tick(); }
+      root.cleanup = cleanup;      // what route() would hold on to
       return root;
     } catch (err) {
       check(label, false, err.message);
@@ -589,6 +698,59 @@ const db = getDb();
     }
   }
 
+  // ---- leaving the runner must actually stop it ----
+  //
+  // Dom, 2026-08-25: "I've closed backed out of the day but the session is
+  // still running... while on dashboard." Only the X used to clean up, so any
+  // other exit left the 250 ms ticker alive. `root` is the shared #app element,
+  // so a hold reaching zero called commit() -> logged a set he never did ->
+  // redrew the runner over whatever screen he was on.
+  //
+  // This is the check that would have caught it: count the timers.
+  if (holdAt >= 0) {
+    clearAllTimers();
+    const before = query('SELECT COUNT(*) c FROM set_log')[0].c;
+
+    // A hold, one second from its target: the tick that fires next is the one
+    // that used to log a set.
+    const target = stepTarget(steps[holdAt]).value;
+    const root = await openAt(holdAt, 'a hold opens for the teardown check', {
+      hold: { index: holdAt, startedAt: Date.now() - (target - 1) * 1000, accMs: 0, running: true },
+    });
+    if (root) {
+      check('the runner is running a timer while it is on screen',
+        liveTimerCount() > 0, liveTimerCount() + ' live');
+      check('and it hands back a cleanup for route() to run',
+        typeof root.cleanup === 'function', typeof root.cleanup);
+
+      // What route() does on the way to another screen.
+      if (typeof root.cleanup === 'function') root.cleanup();
+
+      check('leaving the runner leaves NO timer behind',
+        liveTimerCount() === 0, liveTimerCount() + ' still live');
+
+      // Even if a stray closure did fire, it must not reach the database.
+      const other = screen();
+      other.append(globalThis.document.createElement('p'));
+      const marker = other.children.length;
+      // A REAL wait, not microtask ticks: the ticker runs on a 250 ms interval
+      // and would never fire inside setImmediate drains, so tick() alone would
+      // pass this check whether or not the timer was still alive.
+      await new Promise((r) => setTimeout(r, 450));
+      check('no set is logged by a runner that has been left',
+        query('SELECT COUNT(*) c FROM set_log')[0].c === before,
+        before + ' -> ' + query('SELECT COUNT(*) c FROM set_log')[0].c);
+      check('and it does not repaint itself over the screen you moved to',
+        other.children.length === marker, other.children.length + ' vs ' + marker);
+
+      // Idempotent: route() may run it again, and a second call must be quiet.
+      let threw = null;
+      try { root.cleanup(); } catch (err) { threw = err.message; }
+      check('running the cleanup twice is harmless', threw === null, String(threw));
+    }
+    clearAllTimers();
+  }
+
   if (effortAt >= 0) {
     const root = await openAt(effortAt, 'a sled step renders');
     if (root) {
@@ -631,6 +793,26 @@ const db = getDb();
         < home.children.indexOf(home.querySelector('.daylist')));
     check('the slim bar is still there alongside it',
       !!home.querySelector('.slimbar'));
+    // Dom, 2026-08-25: "Resume day 1 section should be smaller button below the
+    // day 1 info. Right now they are currently overlapping each other."
+    check('the resume button sits below the day line, in its own row',
+      !!home.querySelector('.resumeactions .resumebtn'));
+    check('and the way out of the session is right next to it',
+      !!home.querySelector('.resumeactions .resumeover'),
+      home.querySelector('.resumecard').textContent);
+    // He went looking for this and could not find it.
+    {
+      const over = home.querySelector('.resumeover');
+      const sessions = query("SELECT COUNT(*) c FROM session WHERE status = 'abandoned'")[0].c;
+      globalThis.__confirm = false;           // he says no
+      over.click();
+      await tick(3);
+      check('Start over asks first, and no means no',
+        query("SELECT COUNT(*) c FROM session WHERE status = 'abandoned'")[0].c === sessions,
+        'abandoned ' + sessions + ' -> '
+          + query("SELECT COUNT(*) c FROM session WHERE status = 'abandoned'")[0].c);
+      globalThis.__confirm = true;
+    }
     check('logged work moves the legend off zero',
       !home.querySelector('.legendrows .legendrow').classList.contains('legendzero'),
       home.querySelector('.legendrows .legendrow').textContent);

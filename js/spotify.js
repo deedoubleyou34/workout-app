@@ -280,7 +280,7 @@ export async function handleRedirect() {
 
 // Refresh on resume: a phone that slept through the timer wakes up with a
 // token that is already dead.
-export function watchForeground() {
+export function watchForeground(onWake) {
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState !== 'visible') return;
     // a cold launch straight into the runner may not have read the tokens yet
@@ -288,6 +288,12 @@ export function watchForeground() {
     if (!isConnected()) return;
     if (needsRefresh(auth.expires_at)) refresh().catch(() => {});
     else scheduleRefresh();
+    // Coming back from the Spotify app he was just sent to: finish what he
+    // asked for. Silent when nothing is armed, which is almost always.
+    try {
+      const device = await resumeArmedWake();
+      if (device && typeof onWake === 'function') onWake(device);
+    } catch { /* the music simply does not start; never block the session */ }
   });
 }
 
@@ -366,8 +372,17 @@ export async function lastKnownDevice() {
 
 // Returns the device playback landed on, or null if there was nothing to wake.
 // Throws only what the transfer itself threw.
-export async function wake() {
-  const list = await player.devices();
+//
+// `attempts` exists for the cold-start path below: a Spotify app that has just
+// been launched takes a moment to register itself as a Connect device, and a
+// single immediate call reliably misses it.
+export async function wake({ attempts = 1, delayMs = 700 } = {}) {
+  let list = [];
+  for (let i = 0; i < Math.max(attempts, 1); i++) {
+    list = await player.devices();
+    if (list.length) break;
+    if (i < attempts - 1) await new Promise((r) => setTimeout(r, delayMs));
+  }
   if (!list.length) return null;
   const remembered = await lastKnownDevice();
   const target = (remembered && list.find((d) => d.id === remembered.id))
@@ -376,6 +391,82 @@ export async function wake() {
   await player.transfer(target.id);
   rememberDevice(target);
   return target;
+}
+
+// ---------- starting Spotify when it is not running at all ----------
+//
+// Dom, 2026-08-25: "Ensure that Spotify turns on if I hit play even when the
+// app is closed... after a force quit or restart."
+//
+// wake() cannot do this and neither can anything else in the Web API. A
+// force-quit Spotify is NOT in GET /me/player/devices — Connect only lists
+// devices that are running — so there is nothing to transfer to, and no
+// endpoint exists that launches an app. Trying harder against the API is not a
+// route to a fix.
+//
+// What does work is a `spotify:` URL from a real anchor tap: iOS launches the
+// app, it registers as a device, and then transfer behaves normally. So the
+// tap opens Spotify and ARMS an intent; watchForeground() below finishes the
+// job when the app comes back to the front.
+
+const WAKE_KEY = 'spotify-wake-intent';
+export const WAKE_TTL_MS = 3 * 60 * 1000;
+
+// Where to send him. The mapped playlist or album lands him somewhere useful
+// rather than on whatever Spotify last showed; bare `spotify:` just opens it.
+// Pure, so the mapping is a test rather than a guess.
+export function appLink(contextUri) {
+  return /^spotify:(playlist|album|artist):[A-Za-z0-9]+$/.test(String(contextUri || ''))
+    ? contextUri
+    : 'spotify:';
+}
+
+// Is a stored intent still worth acting on? A stale one must never fire — he
+// could be mid-set tomorrow when the app next comes to the front.
+export function isFreshWake(intent, now = Date.now(), ttl = WAKE_TTL_MS) {
+  if (!intent || typeof intent !== 'object') return false;
+  const at = Number(intent.at);
+  if (!Number.isFinite(at)) return false;
+  return at <= now && now - at < ttl;
+}
+
+export async function armWake(contextUri = null) {
+  await idbPut(WAKE_KEY, { contextUri: contextUri || null, at: Date.now() });
+}
+
+export async function pendingWake() {
+  try {
+    return (await idbGet(WAKE_KEY)) || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function clearWake() {
+  try {
+    await idbPut(WAKE_KEY, null);
+  } catch { /* nothing to do */ }
+}
+
+// Called on the way back into the app. Returns the device it started on, or
+// null if there was nothing armed or nothing to wake.
+export async function resumeArmedWake() {
+  const intent = await pendingWake();
+  if (!intent) return null;
+  if (!isFreshWake(intent)) {
+    await clearWake();
+    return null;
+  }
+  await clearWake();                       // one shot, whatever happens next
+  const device = await wake({ attempts: 4, delayMs: 700 });
+  if (!device) return null;
+  try {
+    await player.play(device.id, intent.contextUri || null);
+  } catch {
+    // The transfer already put playback on the phone; a play that does not
+    // take is not worth an error at him mid-session.
+  }
+  return device;
 }
 
 // Run a playback command, and if Spotify says there is no active device, wake

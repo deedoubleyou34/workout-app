@@ -109,9 +109,16 @@ class El {
     return this._text;
   }
   set textContent(v) {
+    // A browser turns this into a TEXT NODE, so anything appended afterwards
+    // sits beside it and both are readable. Storing it in a private field
+    // instead made the getter drop it the moment a child was appended — which
+    // is exactly the shape of "set a message, then append a button", and it
+    // reported the message as missing when the app was right.
     this.children.forEach((c) => { c.parentNode = null; });
     this.children = [];
-    this._text = v == null ? '' : String(v);
+    this._text = '';
+    const text = v == null ? '' : String(v);
+    if (text !== '') this.append(new TextNode(text));
   }
 
   get innerHTML() { return this.textContent; }
@@ -295,6 +302,13 @@ export function clearAllTimers() {
   liveIntervals.clear();
 }
 
+// How many intervals are still running. A screen that has been navigated away
+// from must leave zero behind — the runner used to leave one per visit, and
+// nothing could see it.
+export function liveTimerCount() {
+  return liveIntervals.size;
+}
+
 // ---------- install ----------
 
 // Node defines some of these as getter-only globals (navigator since 21), so
@@ -325,7 +339,11 @@ export function installDom({ root = process.cwd() } = {}) {
     reload() { this.reloaded = true; },
   });
   define('history', { replaceState() { /* url rewriting is not observable here */ } });
-  define('confirm', () => true);
+  // Defaults to yes so existing checks walk the happy path, but a check can
+  // set globalThis.__confirm = false to prove a destructive action actually
+  // stops when the answer is no. A confirm nothing can decline is not tested.
+  globalThis.__confirm = true;
+  define('confirm', () => globalThis.__confirm !== false);
   globalThis.alert = (msg) => { globalThis.__alerts.push(String(msg)); };
   globalThis.__alerts = [];
   globalThis.URL.createObjectURL = () => 'blob:stub';

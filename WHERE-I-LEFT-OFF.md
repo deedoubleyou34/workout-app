@@ -1,6 +1,6 @@
 # Where I left off — Hyperbolic Time Chamber
 
-**Last updated:** 2026-08-25 · **Live build:** 028 · **Status:** every phase in the spec (0–8) is built. Every note you wrote in the three review files has been worked through, and those files are now folded into this one.
+**Last updated:** 2026-08-25 · **Live build:** 029 · **Status:** every phase in the spec (0–8) is built. Every note you wrote in the three review files has been worked through, and those files are now folded into this one.
 
 This is the only handover doc now, apart from **`MUSIC-NOTES.md`**, which covers the in-app music picker and still has its own open gate — see the bottom of this file.
 
@@ -18,7 +18,7 @@ I went back through all three of your marked-up docs line by line against the
 actual code. **34 of 35 items were already built.** The one that was not is the
 colour half of the power-level request, which is fixed in this build. Everything
 is now pushed, and the first thing to check is that **the build number reads
-b028** — in the footer, or the runner's top bar. If it still says 024, that is a
+b029** — in the footer, or the runner's top bar. If it still says 024, that is a
 cache problem, not a code problem: remove the app from your home screen and add
 it again from Safari.
 
@@ -43,6 +43,12 @@ it again from Safari.
 | "Collapse data section into a tab as well to save on screen space" | **Data ▾** collapses like All days, exports and both links inside. The footer stays out — it carries the build number. |
 | "add music bar to the top of the screen" | It is now the **first thing on the page and sticky**, so it stays put while everything else scrolls. |
 | "the audio bar doesnt move in a rotating" | **Fixed, and it was a real bug** — see below. |
+| "Resume day 1… currently overlapping each other" | **Fixed.** The button was an `<a>`, and CSS was giving it a height and padding it could not have — so it painted over the lines above and below. Now a smaller button, in its own row under the day line. |
+| "the start over button is missing" | It existed, buried on the Day screen. **Start over is now on the resume card**, right next to Resume, and still asks first. |
+| "the ↻ refresh button isn't working" | **Removed.** It called an empty function and showed no sign of doing anything, sat next to ⏮ ⏯ ⏭, and read like a reset. The panel re-checks Spotify every 10 s by itself. |
+| "Tab the cue over music section…" | Music card is now the track and ⏮ ⏯ ⏭, with **Advanced ▾** holding devices, cues-over-music, test search and disconnect. |
+| "Ensure that Spotify turns on if I hit play even when the app is closed" | **Done, with one honest limit** — see below. |
+| "give me a confirmation to refresh everything" | Two different things, so two places: **Start over** on the resume card for restarting a day, and **Start fresh — delete all training data →** named outright in the Data tab. Both still confirm. |
 | Spec audit — set number in cues ("keep as is"), weight in cues ("not necessary"), spoken summary ("don't add"), Done tap on clamshells ("keep for accountability") | All four left exactly as they were. Those questions are closed. |
 
 ---
@@ -60,6 +66,42 @@ When there is nothing to resume, that space belongs to the slim music bar, which
 **And a second trap underneath the first, which I want to own rather than bury.** I shipped that card working and the *tap* broken, for one commit. The card is deliberately not limited to today; the runner was still asking for today's session only. So the card would offer last night's force-quit session, you would tap Resume, the runner would find nothing for today, start a brand-new empty session — and your night's work would be stranded with the old session sitting open forever. Fixed: the runner and the card now share one definition of which session is live, and there is a test that goes from one to the other, because the test that only checked the card passed the whole time.
 
 A stale *empty* session — a day you opened weeks ago and never worked — is closed out rather than left open behind the new one.
+
+---
+
+## 🔴 The session that kept running — you found the worst bug in the project
+
+> *"I've closed backed out of the day but the session is still running… session is still [counting] while on dashboard."*
+
+You were right, and it was worse than it looked.
+
+Leaving the runner **only cleaned up if you pressed the ✕**. Any other way out —
+the back gesture, a link, the hash changing — left its 250 ms timer running.
+Since every screen is drawn into the same element, that timer was still holding
+a reference to it. So:
+
+- a **rest** timer reaching zero said *"go"* and vibrated at you on the dashboard
+- a **hold** timer reaching zero was worse: it called the log-this-set path,
+  **wrote a set you never did into your training history**, and then redrew the
+  runner over the top of whatever screen you were looking at
+
+The second one is the reason this build went out before anything else on your
+list. A set logged by a runner you had already left is corrupt data, and it
+feeds the progression engine — it would have quietly changed what the app told
+you to lift.
+
+**Fixed with one teardown path instead of two.** Navigation now cleans up the
+screen it is leaving, whatever route you took out of it, so the ✕ and the back
+gesture are the same code. That they were different is the whole reason this
+existed.
+
+There is also a second, independent guard: a torn-down runner refuses to write
+to the database at all, even if some stray timer did survive. One protection
+against corrupt training data was not enough.
+
+**And a test that would have caught it.** The harness now counts live timers:
+open the runner, leave it, and assert nothing is still ticking. I checked it
+fails against the old code before trusting it.
 
 ---
 
@@ -89,6 +131,35 @@ Three things came out of fixing it:
    about 28 characters. Failing towards scrolling is the right way round.
 3. **It now has four tests** covering a long title, a short one, and both
    measurement-failure cases.
+
+---
+
+## Waking Spotify when it is not running
+
+You asked for Spotify to turn on when you hit play, even after a force quit or
+a restart. Here is exactly what I could and could not do.
+
+**What I could not do:** when Spotify is fully closed it does not appear on
+Spotify's own device list at all — it is not a device that is "asleep", it is
+not there. There is no call in Spotify's API that starts an app that is not
+running. No amount of retrying reaches it.
+
+**What works instead:** press play, and if nothing is reachable you now get
+**Open Spotify** instead of a dead end. Tapping it launches Spotify — straight
+to the playlist that block is mapped to, if you have one set — and when you
+switch back the app hands playback to your phone and starts what you asked for.
+You get a line confirming it.
+
+It is one extra tap, once, and only when Spotify is genuinely not running. If
+Spotify is merely in the background, the app already handles that silently.
+
+**The one limit worth knowing.** Every play/pause/skip is a round trip to
+Spotify's servers. Downloaded tracks do not change that, and neither does the
+fact that it is the same phone — with no signal the app cannot control Spotify
+at all, and you would see "No connection — Spotify controls need the network".
+You said you have signal where you train, so this should never bite. If you
+ever end up somewhere without it, control the music from Spotify directly; the
+workout itself is unaffected and never stalls.
 
 ---
 
@@ -156,7 +227,7 @@ That was always true; the legend is just the first thing to say it out loud. I d
 | Local repo | `Projects/Workout/workout-app/` — standalone git repo, pushes straight to Pages |
 | Spotify Client ID | `cf46be5104434a87948db209215d61f7` (redirect URI = the Pages URL exactly; no secret, PKCE) |
 | Name | **Hyperbolic Time Chamber** (icon label "Chamber") |
-| Test suite | **248 cases** + 124 screen checks + 5 pre-deploy commands. On the phone, expect **ALL 248 TESTS PASSED** |
+| Test suite | **259 cases** + 146 screen checks + 5 pre-deploy commands. On the phone, expect **ALL 259 TESTS PASSED** |
 
 The parent folder holds reference copies of `workout_plan.txt`, `PROJECT_SPEC.md`, `CLAUDE.md`. **The copies inside `workout-app/` are canonical** — the parent copies are synced at phase boundaries.
 
@@ -196,7 +267,7 @@ Grouped by what you have to be holding to do it. Everything already ticked off i
 
 ### At the phone, thirty seconds each
 
-- [ ] **Run the tests in Safari.** Home → **Data ▾** → *Run progression tests →*. Expect **ALL 248 TESTS PASSED**.
+- [ ] **Run the tests in Safari.** Home → **Data ▾** → *Run progression tests →*. Expect **ALL 259 TESTS PASSED**.
 - [ ] **The home screen.** Resume card, slim music bar, All-days drop-down, Next up below it. Does the order read right?
 - [ ] **The power ladder.** Are the forms in the right places, and do you want to answer the nightly-weight question above?
 - [ ] **The dashboard drop-down.** Open it and swipe. It will still be thin on data — I am asking whether it looks right, not whether it says anything yet.
@@ -315,7 +386,7 @@ Forgetting the `CACHE` bump means phones keep serving the old shell from cache.
 
 | | |
 |---|---|
-| `run_tests.mjs` | the 248 logic cases — progression rules, step ordering, cue text, ducking, the power ladder, body parts |
+| `run_tests.mjs` | the 259 logic cases — progression rules, step ordering, cue text, ducking, the power ladder, body parts |
 | `verify_seed.mjs` | every line the app can say has a clip, including the ones an accepted progression can reach |
 | `verify_migration.mjs` | after a reseed, every logged set still points at its original (day, exercise, occurrence) |
 | `verify_imports.mjs` | every named import resolves — the screen modules are not run by any test, so a renamed export there is a blank screen — **and** every shipped file is in the service worker's precache list |

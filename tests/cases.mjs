@@ -14,7 +14,7 @@ import { buildSteps, remainingSeconds, resumeIndex, progressOf, stepTarget, isTi
          MAIN_REST_FLOOR } from '../js/runner.js';
 import { setText, restText, restIsSilent, cueId, spokenSeconds, hasSecondsClip } from '../js/cues.js';
 import { needsRefresh, callbackParams, retryAfterMs, describeError,
-         nowPlayingText } from '../js/spotify.js';
+         nowPlayingText, appLink, isFreshWake, WAKE_TTL_MS } from '../js/spotify.js';
 import { pickStrategy, planCycle, canRelease, worthDucking, MIN_CYCLE_MS, MIN_CUE_MS } from '../js/ducking.js';
 import { capacityOf, bestCapacity, gapPct, weeklySeries,
          verdictFor } from '../js/asymmetry.js';
@@ -1157,6 +1157,37 @@ export async function run(ctx) {
 
     check('every body part has a human label',
       BODY_PARTS.every((p) => p.label && p.label !== p.key));
+  }
+
+  // 24f. opening Spotify by hand when it is not running (Dom, 2026-08-25).
+  //      A force-quit Spotify is not in GET /me/player/devices at all, so no
+  //      API call can reach it — the only lever is a spotify: URL from a tap.
+  {
+    eq('a mapped playlist sends him straight to it',
+      appLink('spotify:playlist:37i9dQZF1DXcBWIGoYBM5M'), 'spotify:playlist:37i9dQZF1DXcBWIGoYBM5M');
+    eq('an album works the same way',
+      appLink('spotify:album:1An0Kk9bJcCLkYuG0AS9Cx'), 'spotify:album:1An0Kk9bJcCLkYuG0AS9Cx');
+    eq('nothing mapped still opens the app', appLink(null), 'spotify:');
+    eq('and so does something that is not a Spotify uri at all',
+      [appLink('https://example.com'), appLink(''), appLink(undefined)],
+      ['spotify:', 'spotify:', 'spotify:']);
+    check('a url that only looks like one is not passed through',
+      appLink('spotify:playlist:../../evil') === 'spotify:');
+
+    // A stale intent must never fire — he could be mid-set tomorrow when the
+    // app next comes to the front.
+    const now = 1_000_000_000;
+    check('an intent armed a moment ago is acted on',
+      isFreshWake({ at: now - 5000 }, now));
+    check('one armed longer ago than the window is not',
+      !isFreshWake({ at: now - WAKE_TTL_MS - 1 }, now));
+    check('the boundary itself is stale, not fresh',
+      !isFreshWake({ at: now - WAKE_TTL_MS }, now));
+    check('nothing armed is not an intent', !isFreshWake(null, now));
+    check('and neither is a malformed one',
+      !isFreshWake({}, now) && !isFreshWake({ at: 'soon' }, now) && !isFreshWake('yes', now));
+    check('a clock that jumped backwards does not make one fresh forever',
+      !isFreshWake({ at: now + 60_000 }, now));
   }
 
   // 25. rest countdown is wall-clock, so a throttled/backgrounded app catches up

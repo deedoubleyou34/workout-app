@@ -92,6 +92,88 @@ Do not scaffold future phases "while you're in there." The gates exist because i
 
 Running record of audit findings and decisions made as phases progress. Newest first. Add an entry whenever a phase surfaces something that changes the plan, the spec, or how we work.
 
+### 2026-08-25 — Build 029. The runner did not stop when you left it.
+
+**The worst bug this project has had, and four rounds of review walked past
+it.** Dom: "I've closed backed out of the day but the session is still
+running... while on dashboard."
+
+`route()` in `js/main.js` had **no teardown of the previous screen**, and
+`renderRun` only cleaned up inside `quit.onclick`. Leave the runner any other
+way — back gesture, a link, a hash change — and its 250 ms interval kept
+running, along with an accumulating `visibilitychange` listener, the wake lock,
+audio and an active duck.
+
+Because every screen renders into the same `#app` element, the surviving closure
+still pointed at it:
+- a **rest** ticker at zero fired `CUE_GO` and `navigator.vibrate` on the dashboard
+- a **hold** ticker at zero called `commit()` — **writing a `set_log` row for a
+  set that never happened** — then `go()` → `draw()` → `innerHTML = ''` and
+  repainted the runner over whatever screen was showing
+
+The second is data corruption feeding the progression engine, which is why this
+shipped ahead of everything else on his list.
+
+**The shape: two exits from one state, only one of which cleaned up.** The ✕
+did the teardown; every other way out did not. Any time a screen owns a timer,
+a lock or a listener, the cleanup belongs to *navigation*, not to one button.
+`route()` now holds the current screen's cleanup and runs it before rendering
+the next; `renderRun` returns one; `quit.onclick` only sets the hash, so both
+paths are the same code.
+
+**Two independent guards, deliberately.** Clearing the interval stops the noise;
+a `dead` flag checked in `draw`/`go`/`commit`/`paint`/`paintHold` is what stops
+a stray closure reaching the database. Corrupt training history is worth more
+than one line of defence — and the sabotage run proved it, because with the
+interval clear disabled the timer check failed while the `dead` guard still kept
+`set_log` clean.
+
+**The check that would have caught it:** `tools/domstub.mjs` now exports
+`liveTimerCount()`. Open the runner, tear it down, assert zero. Verified it
+fails against the old behaviour before trusting it — a regression test never run
+against the bug is a guess.
+
+**Two stub fidelity bugs, both of which made the app look wrong when it was right.**
+- `set textContent` stored a private field instead of creating a TEXT NODE, so
+  the getter dropped it the moment a child was appended. "Set a message, then
+  append a button" reported the message as missing. It appends a `TextNode` now,
+  like a browser.
+- `confirm()` was hardwired to `true`, so no destructive action's "no" path had
+  ever been exercised. It reads `globalThis.__confirm` now. **A confirm nothing
+  can decline is not tested.**
+
+**`.btn` had no `display`, and an `<a>` is `display: inline`** — where vertical
+padding, border and `min-height` do not affect line height, so the box paints
+over its neighbours. That is what overlapped the resume card. `.nextstart` and
+`.progresslink` each happened to declare `display: block`; `.resumebtn` did not,
+and `js/ui/day.js:193` escaped only because `.btnrow` is flex and blockifies its
+children. Fixed at the base with `a.btn { display: inline-block }` and guarded
+by a CSS-source assertion.
+
+**A force-quit Spotify cannot be woken by the Web API, and that is not a
+limitation to engineer around.** It is not on `GET /me/player/devices` at all —
+Connect lists running devices only — so there is nothing to transfer to and no
+endpoint that launches an app. The lever that exists is a `spotify:` URL from a
+real anchor tap: it launches the app, which then registers as a device.
+`armWake()` persists the intent through `idbPut` (iOS may reload the PWA while
+it is backgrounded) and `watchForeground()` finishes it on return, with a 3
+minute freshness window so a stale intent never fires mid-set and a 4-attempt
+device poll because a just-launched Spotify takes a moment to appear.
+
+**Offline is a hard limit worth stating plainly rather than papering over:**
+every player command is a round trip to `api.spotify.com`. Downloads do not
+change it and neither does being the same phone.
+
+**`collapsible()` moved to `js/ui/widgets.js`.** It was written in `home.js`, and
+`music.js` needed it for the new Advanced tab — but `home.js` already imports
+`renderMusic`, so importing it back would have been a cycle. Anything two
+screens both need goes in widgets now.
+
+**Removed the `↻` button.** It called an empty function, showed no sign of doing
+anything, and sat in the transport row where Dom read it as a reset. The panel
+re-polls every 10 s anyway. A control that does something invisible is worse
+than no control.
+
 ### 2026-08-25 — Build 028. The one that had never been deployed.
 
 **Read this before believing any audit of this project.** Dom reported the new

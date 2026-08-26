@@ -8,6 +8,7 @@
 import * as spotify from '../spotify.js';
 import * as ducking from '../ducking.js';
 import { clearPickerCache } from './picker.js';
+import { collapsible } from './widgets.js';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -170,9 +171,12 @@ const stopPrevious = new Map();
 
 // container: where to draw. compact: the runner's one-line version.
 // key: which compact slot this is ('rest', 'sheet', ...).
-export function renderMusic(container, { compact = false, key = 'default' } = {}) {
+// contextUri: what SHOULD be playing here, if the caller knows. Used only to
+// send him to the right place when Spotify has to be opened by hand.
+export function renderMusic(container, { compact = false, key = 'default', contextUri = null } = {}) {
   let timer = null;
   let disposed = false;
+  const nowContextUri = () => (typeof contextUri === 'function' ? contextUri() : contextUri);
 
   const root = el('div', 'music' + (compact ? ' music-compact' : ''));
   container.append(root);
@@ -248,16 +252,29 @@ export function renderMusic(container, { compact = false, key = 'default' } = {}
     const next = button('⏭', 'Next track', () => spotify.player.next());
     controls.append(prev, toggle, next);
 
-    if (!compact) {
-      const refreshBtn = button('↻', 'Re-read what Spotify is doing', async () => {});
-      controls.append(refreshBtn);
-    }
+    // No refresh button. It called an empty function, showed no sign it had
+    // done anything, and sat in the transport row where it read like a reset —
+    // which is exactly how Dom read it (2026-08-25). The panel re-polls Spotify
+    // every 10 s on its own, so it was buying nothing for that confusion.
 
     root.append(track, controls, note);
 
     if (!compact) {
+      // Dom, 2026-08-25: "Tab the cue over music section as cue included
+      // devices and disconnect for Spotify and test search." So the card keeps
+      // the track and the transport controls, and everything you set up once
+      // goes behind one tab.
+      const advanced = collapsible({
+        label: 'Advanced',
+        hint: 'devices · cues · search',
+        storageKey: 'htc-music-advanced',
+        cls: 'musicadvanced',
+      });
+      const panel = advanced.body;
+      root.append(advanced.node);
+
       const devices = el('div', 'musicdevices');
-      root.append(devices);
+      panel.append(devices);
 
       const pick = el('button', 'btn btn-small', 'Devices…');
       // A second tap closes the list (Dom, 2026-08-25: it opened but never
@@ -334,7 +351,7 @@ export function renderMusic(container, { compact = false, key = 'default' } = {}
         }
       };
       access.append(testSearch, searchLine);
-      root.append(access);
+      panel.append(access);
 
       // ---- ducking: what cues will do to the music, spec Phase 6 step 5 ----
       const duckBox = el('div', 'duckbox');
@@ -352,7 +369,7 @@ export function renderMusic(container, { compact = false, key = 'default' } = {}
         }
       };
       duckBox.append(duckLine, duckBtn);
-      root.append(duckBox);
+      panel.append(duckBox);
 
       function showDuckPlan(plan) {
         duckBox.querySelector('.escape')?.remove();
@@ -386,7 +403,7 @@ export function renderMusic(container, { compact = false, key = 'default' } = {}
       };
       const row = el('div', 'btnrow');
       row.append(pick, out);
-      root.append(row);
+      panel.append(row);
     }
 
     function showError(err) {
@@ -405,6 +422,20 @@ export function renderMusic(container, { compact = false, key = 'default' } = {}
         again.onclick = () => spotify.beginLogin();
         note.append(document.createTextNode(' '));
         note.append(again);
+      }
+      // Nothing is reachable at all — the usual cause is Spotify being
+      // force-quit, in which case it is not even on the device list and there
+      // is no API call that can start it (Dom, 2026-08-25). A real anchor tap
+      // to a spotify: URL launches it; the intent armed here is finished by
+      // watchForeground() when he comes back.
+      if (err && err.kind === 'no_device') {
+        note.textContent = 'Spotify is not running. Open it once and this will '
+          + 'pick up where you left off.';
+        const open = el('a', 'btn btn-small openspotify', '▶  Open Spotify');
+        open.href = spotify.appLink(nowContextUri());
+        open.onclick = () => { spotify.armWake(nowContextUri()).catch(() => {}); };
+        note.append(document.createTextNode(' '));
+        note.append(open);
       }
     }
 
